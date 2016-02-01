@@ -1,0 +1,12 @@
+#ifndef LSDSLAMCORE_GLOBAL_H
+#define LSDSLAMCORE_GLOBAL_H
+
+// #include <QtCore/qglobal.h>
+
+#if defined(LSDSLAMCORE_LIBRARY)
+#  define LSDSLAMCORESHARED_EXPORT Q_DECL_EXPORT
+#else
+#  define LSDSLAMCORESHARED_EXPORT Q_DECL_IMPORT
+#endif
+
+#endif // LSDSLAMCORE_GLOBAL_H
