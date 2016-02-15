@@ -13,6 +13,10 @@ TEMPLATE    = lib
 
 DEFINES     += LSDSLAMCORE_LIBRARY
 
+#QMAKE_CFLAGS_DEBUG    += -pg
+#QMAKE_CXXFLAGS_DEBUG  += -pg
+#QMAKE_LFLAGS_DEBUG    += -pg
+
 SOURCES +=  \
             src/LiveSLAMWrapper.cpp \
             src/SlamSystem.cpp
@@ -23,36 +27,34 @@ HEADERS +=  \
 
 unix {
 
-    INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/
-    INCLUDEPATH += /home/sergey/libs/Sophus
+#    INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/
+#    INCLUDEPATH += /home/sergey/libs/Sophus
 
-    INCLUDEPATH +=  /home/sergey/MyProject/MySlamProject/Qt/lsdSlamUtil/
-    LIBS        +=  -L/home/sergey/MyProject/MySlamProject/Qt/FullProject/build/lsdSlamUtil    \
+    BASE_LIBS_PATH = $$PWD/../build
+
+    INCLUDEPATH +=  ../lsdSlamUtil/
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamUtil          \
                     -llsdSlamUtil
 
-    INCLUDEPATH +=  /home/sergey/MyProject/MySlamProject/Qt/lsdSlamIO/
-    LIBS        +=  -L/home/sergey/MyProject/MySlamProject/Qt/FullProject/build/lsdSlamIO     \
+    INCLUDEPATH +=  ../lsdSlamIO/
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamIO            \
                     -llsdSlamIO
 
-    INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/lsdSlamFrame/
-    LIBS        +=  -L/home/sergey/MyProject/MySlamProject/Qt/FullProject/build/lsdSlamFrame  \
+    INCLUDEPATH +=  ../lsdSlamFrame/
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamFrame         \
                     -llsdSlamFrame
 
-    INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/lsdSlamGlobalMapping/
-    LIBS        +=  -L/home/sergey/MyProject/MySlamProject/Qt/FullProject/build/lsdSlamGlobalMapping  \
+    INCLUDEPATH +=  ../lsdSlamGlobalMapping/
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamGlobalMapping \
                     -llsdSlamGlobalMapping
 
-    INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/lsdSlamTracking/
-    LIBS        +=  -L/home/sergey/MyProject/MySlamProject/Qt/FullProject/build/lsdSlamTracking  \
+    INCLUDEPATH +=  ../lsdSlamTracking/
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamTracking      \
                     -llsdSlamTracking
 
-    INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/lsdSlam3DOutput/
-    LIBS        +=  -L/home/sergey/MyProject/MySlamProject/Qt/FullProject/build/lsdSlam3DOutput  \
+    INCLUDEPATH +=  ../lsdSlam3DOutput/
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlam3DOutput      \
                     -llsdSlam3DOutput
-
-    #INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/lsdSlamDepth/
-    #LIBS        +=  -L/home/sergey/MyProject/MySlamProject/Qt/FullProject/build/lsdSlamDepth  \
-    #                -llsdSlamDepth
 
     # OpenCV
     OPENCV_INCLUDE_PATH        = /home/sergey/libs/opencv-3.0.0/include
@@ -70,12 +72,9 @@ unix {
         LIBS    += -lopencv_features2d  -lopencv_calib3d
 
     # Boost
-    LIBS    +=  -L/home/sergey/libs/boost_1_59_0/stage/lib      \
-                -lboost_thread                                  \
-                -lboost_system
-
+    LIBS    +=  -lboost_thread -lboost_system
 
     #target.path = /usr/lib
-    target.path = /home/sergey/MyProject/MySlamProject/lsdSlamSharedLibs
-    INSTALLS    +=  target
+    target.path = $$BASE_LIBS_PATH/lsdSlamApp
+    INSTALLS += target
 }

@@ -20,10 +20,9 @@
 
 #include "LiveSLAMWrapper.h"
 
-//#include "IOWrapper/Timestamp.h"
 #include "IOWrapper/TimestampedObject.h"
 
-#include "IOWrapper/InputImageStream.h"
+//#include "IOWrapper/InputImageStream.h"
 #include "IOWrapper/VideoReader/slamvideoreader.h"
 
 #include "Output3DWrapper/myoutput3dwrapper.h"
@@ -41,17 +40,14 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     // Модуль еще не инициализирован
     isInitialized = false;
 
-    /// It' in utils now
+    /// It's in utils now
     // m_poImageDisplay = new SLAMImageDisplay();
 
     // Инициализровать указатели
-    m_poImageStream  = new SLAMVideoReader( videoFilePath  );
+    m_poImageStream  = new SLAMVideoReader( 8, videoFilePath  );
 
     // Вычитать файл каллибровки
     m_poImageStream->setCalibration( unditorFilePath );
-
-    // Установить этот класс как обрботчик новго изображения
-    m_poImageStream->getBuffer()->setReceiver(this);
 
     // Установить параметры камеры
     fx = m_poImageStream->fx();
@@ -75,7 +71,7 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
 
     /// make Odometry
     // Создаем экземпляр SlamSystem
-    m_poMonoOdometry = new SlamSystem( width, height, K_sophus, m_bDoSlam );
+    m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
 
     // ROSOutput3DWrapper
     m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
@@ -110,36 +106,27 @@ void LiveSLAMWrapper::Loop()
     // Цикл обработки потоков
     while( true )
     {
-        // Получить доступ к мютексу потока входных изображений
-        boost::unique_lock<boost::recursive_mutex> waitLock( m_poImageStream->getBuffer()->getMutex() );
 
-        // Если не сброс системы и буффер пустой
-        while ( !fullResetRequested &&  !( m_poImageStream->getBuffer()->size() > 0 ) )
-        {
-            // Ждем изменение состояния буффера
-            notifyCondition.wait( waitLock );
-		}
-        // Разблокировать мютекс
-        // The block was necessary for waiting condition
-		waitLock.unlock();
-		
-        // Если требуется сбросить систему (глобальная переменная)
-        if( fullResetRequested )
-        {
-            // Сбросить все
-            resetAll();
-            // СБросить флаг запроса
-            fullResetRequested = false;
-            // Если буфер пустой
-            if ( !(m_poImageStream->getBuffer()->size() > 0) )
-                // Перейти на следующую итерацию
-                continue;
-        }
-		
         // Получить экземпляр изображения из буффера
-        TimestampedMat image = m_poImageStream->getBuffer()->first();
-        // Удалить изображение из очереди
-        m_poImageStream->getBuffer()->popFront();
+        TimestampedMat image = m_poImageStream->next();
+
+        if(image.data.empty())
+            break;
+		
+        /// Необдим способ асинхронного сброса, остановки, паузы
+//        // Если требуется сбросить систему (глобальная переменная)
+//        if( fullResetRequested )
+//        {
+//            // Сбросить все
+//            resetAll();
+//            // СБросить флаг запроса
+//            fullResetRequested = false;
+
+//            // Если буфер пустой
+//            if ( !(m_poImageStream->getBuffer()->size() > 0) )
+//                // Перейти на следующую итерацию
+//                continue;
+//        }
 		
         /// !!!! Вывести изображение
         /// //TODO:
@@ -223,7 +210,9 @@ void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
 void LiveSLAMWrapper::requestReset()
 {
     fullResetRequested = true;
-    notifyCondition.notify_all();
+
+        /// TODO:
+//    notifyCondition.notify_all(); ???????????
 }
 
 void LiveSLAMWrapper::resetAll()

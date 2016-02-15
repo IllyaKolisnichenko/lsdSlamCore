@@ -46,7 +46,7 @@ class InputImageStream;
 class Timestamp;
 
 // Обертка для SlamSystem
-struct LiveSLAMWrapper : public Notifiable
+class LiveSLAMWrapper //: public Notifiable
 {
 
 //friend class LiveSLAMWrapperROS;
