@@ -40,6 +40,7 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     // Модуль еще не инициализирован
     isInitialized = false;
 
+    m_pCVFaceCascade.load( FACE_CASCADE_NAME);
     /// It's in utils now
     // m_poImageDisplay = new SLAMImageDisplay();
 
@@ -132,13 +133,16 @@ void LiveSLAMWrapper::Loop()
         /// //TODO:
  //       m_poImageDisplay->displayImage( "MyVideo", image.data );
         // Вывести изображение
+
+        detectAndDraw( image.data );
+
         Util::displayImage( "MyVideo", image.data );
 
         //Обработать новое изображение
         newImageCallback( image.data, image.timestamp );
 
         //m_poImageDisplay->waitKey( 500 );
-        //cv::waitKey( 20 );
+        // cv::waitKey( 100 );
 	}
 }
 
@@ -234,6 +238,58 @@ void LiveSLAMWrapper::resetAll()
     isInitialized   = false;
 
     Util::closeAllWindows();
+}
+
+void LiveSLAMWrapper::detectAndDraw(cv::Mat &image )
+{
+    // Список прямоугольников для лиц
+    std::vector < cv::Rect >   faces;
+    // Временный фрейм
+    cv::Mat             frame_gray;
+
+    // Преобразовать цвета
+    //cv::cvtColor( image, frame_gray, CV_RGB2GRAY  );
+
+    frame_gray = image.clone();
+
+    // Выровнять гистограмму
+    cv::equalizeHist( frame_gray, frame_gray );
+
+    // Определить список лиц
+    m_pCVFaceCascade.detectMultiScale(  frame_gray              ,
+                                        faces                   ,
+                                        1.1                     ,
+                                        2                       ,
+                                        0|CV_HAAR_SCALE_IMAGE   ,
+                                        cv::Size(100, 100)      );
+
+    // qDebug() << "Faces number: " << faces.size();
+
+    if( faces.size() != 0)
+    {
+        //m_oTempImage = m_oCVMat.clone();
+        cv::Mat m_oTempImage = frame_gray.clone();
+
+//        cv::imshow("Grayscale Image", frame_gray);
+        frame_gray.setTo(cv::Scalar(0, 0, 0));
+
+        m_oTempImage = m_oTempImage(faces[0]);
+
+//        cv::imshow("Before equalize Image", m_oTempImage);
+        // Выровнять гистограмму
+        cv::equalizeHist( m_oTempImage, m_oTempImage );
+
+//        cv::imshow("After equalize Image", m_oTempImage);
+
+        // Преобразовать цвета
+        //cv::cvtColor( m_oTempImage, TempImage_gray, CV_RGB2GRAY  );
+
+        m_oTempImage.copyTo( frame_gray(faces[0]) );
+
+//        cv::imshow("Result Image", frame_gray);
+    }
+
+    image = frame_gray.clone();
 }
 
 }

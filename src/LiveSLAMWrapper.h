@@ -30,12 +30,16 @@
 
 #include "SophusUtil.h"
 
+#include "opencv2/opencv.hpp"
+
 namespace cv {
 	class Mat;
 }
 
 namespace lsd_slam
 {
+#define FACE_CASCADE_NAME   "/home/sergey/libs/opencv-3.0.0/data/haarcascades/haarcascade_frontalface_alt.xml"
+
 
 class SlamSystem;
 //class LiveSLAMWrapperROS;
@@ -78,7 +82,8 @@ public:
 	
     // Возвращает указатель на объект SlamSystem
 //    inline SlamSystem* getSlamSystem() {return m_poMonoOdometry;}
-	
+
+    void detectAndDraw(cv::Mat &image);
 private:
     // Указатели на объекты входного и выходного потока
     InputImageStream*   m_poImageStream;
@@ -102,6 +107,9 @@ private:
     int     width, height;
 
     int     imageSeqNumber;
+
+    // Классификаторы для обнраужения объекта
+    cv::CascadeClassifier   m_pCVFaceCascade;
 };
 
 }

@@ -69,7 +69,6 @@ unix {
         LIBS    += -lopencv_objdetect   -lopencv_imgproc
         LIBS    += -lopencv_videoio     -lopencv_core
         LIBS    += -lopencv_imgcodecs   -lopencv_highgui
-        LIBS    += -lopencv_features2d  -lopencv_calib3d
 
     # Boost
     LIBS    +=  -lboost_thread -lboost_system

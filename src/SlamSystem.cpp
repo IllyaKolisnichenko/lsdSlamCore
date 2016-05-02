@@ -21,7 +21,6 @@
 #include "SlamSystem.h"
 
 #include "DataStructures/Frame.h"
-//#include "DataStructures/FrameMemory.h"
 
 #include "DepthEstimation/DepthMap.h"
 
@@ -34,12 +33,9 @@
 #include "GlobalMapping/KeyFrameGraph.h"
 
 #include "GlobalMapping/TrackableKeyFrameSearch.h"
-//#include "GlobalMapping/g2oTypeSim3Sophus.h"
 
 #include "ImageDisplay.h"
 #include "Output3DWrapper/myoutput3dwrapper.h"
-
-//#include <g2o/core/robust_kernel_impl.h>
 
 #include "deque"
 
@@ -505,8 +501,8 @@ void SlamSystem::finishCurrentKeyframe()
         }
     }
 
-    if(outputWrapper!= 0)
-        outputWrapper->publishKeyframe(currentKeyFrame.get());
+    if(outputWrapper != 0 )
+        outputWrapper->publishKeyframe( currentKeyFrame.get() );
 }
 
 void SlamSystem::discardCurrentKeyframe()
@@ -726,7 +722,7 @@ bool SlamSystem::updateKeyframe()
         continuousPCOutput  &&
         currentKeyFrame != 0        )
         // Publish current Key Frame for redraw Point Cloud
-        outputWrapper->publishKeyframe( currentKeyFrame.get( ) );
+        outputWrapper->publishKeyframe( currentKeyFrame.get() );
 
     return true;
 }
@@ -1067,9 +1063,6 @@ void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
     if (displayDepthMap || depthMapScreenshotFlag)
         debugDisplayDepthMap();
 
-    // For debuging without mapping thread loop
-    // doMappingIteration();
-
     printf("Done Random initialization!\n");
 }
 
@@ -1159,7 +1152,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
     // Расчитать время на выполнение функции
     msTrackFrame = 0.9 * msTrackFrame + 0.1 * ( (tv_end.tv_sec - tv_start.tv_sec) * 1000.0f + ( tv_end.tv_usec - tv_start.tv_usec )/ 1000.0f );
-    // Увеличить счетчик вызовов
+    // Frame counter incriment
     nTrackFrame++;
 
     tracking_lastResidual       = tracker->lastResidual;
