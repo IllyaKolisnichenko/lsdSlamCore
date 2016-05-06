@@ -37,40 +37,41 @@ namespace lsd_slam
 LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorFilePath) :
     m_bDoSlam   (false)
 {
-    // Модуль еще не инициализирован
+    // Module is not initialized yet
     isInitialized = false;
 
-    /// It's in utils now
+    // It's in utils now
     // m_poImageDisplay = new SLAMImageDisplay();
 
-    // Инициализровать указатели
+    // Initialize the pointers
     m_poImageStream  = new SLAMVideoReader( 8, videoFilePath  );
 
-    // Вычитать файл каллибровки
+    // Read the calibration file
     m_poImageStream->setCalibration( unditorFilePath );
 
-    // Установить параметры камеры
+    // Set the parameters of the camera
     fx = m_poImageStream->fx();
     fy = m_poImageStream->fy();
     cx = m_poImageStream->cx();
     cy = m_poImageStream->cy();
 
-    // Установить размеры изображения
+    // Set the size of the image
     width   = m_poImageStream->width();
     height  = m_poImageStream->height();
 
-    // Обнулить указатель
+    // Null the pointers
     outFile = nullptr;
-    // Сформировать название файла для хранения восстановленных положений
+
+    // Make a file name for the file that stores restored positions 
     // outFileName = packagePath+"estimated_poses.txt";
     outFileName = "estimated_poses.txt";
 
-    // Инициализировать матрицу камеры
+    // Initialize the matrix of the camera
     Sophus::Matrix3f K_sophus;
     K_sophus << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
-    /// make Odometry
-    // Создаем экземпляр SlamSystem
+    // Make Odometry
+    // Create an instance of SlamSystem
     m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
 
     // ROSOutput3DWrapper
@@ -79,10 +80,10 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     //  ???
     m_poMonoOdometry->setVisualization( m_poOutputWrapper );
 
-    // Сбросить счетчик
+    // Null the counter
     imageSeqNumber = 0;
 
-    // Start recieve Image
+    // Start to recieve Image
     m_poImageStream->run();
 }
 
@@ -103,38 +104,38 @@ LiveSLAMWrapper::~LiveSLAMWrapper()
 
 void LiveSLAMWrapper::Loop()
 {
-    // Цикл обработки потоков
+    // The loop of threads processing
     while( true )
     {
 
-        // Получить экземпляр изображения из буффера
+        // Get the instance of an image from the buffer 
         TimestampedMat image = m_poImageStream->next();
 
         if(image.data.empty())
             break;
 		
-        /// Необдим способ асинхронного сброса, остановки, паузы
-//        // Если требуется сбросить систему (глобальная переменная)
+        /// We need a method for asynchronous reset, stop and pause
+//        // If we need to reset the system (global variable) 
 //        if( fullResetRequested )
 //        {
-//            // Сбросить все
+//            // Reset everything 
 //            resetAll();
-//            // СБросить флаг запроса
+//            // Reset the flag of request 
 //            fullResetRequested = false;
 
-//            // Если буфер пустой
+//            // If the buffer is empty
 //            if ( !(m_poImageStream->getBuffer()->size() > 0) )
-//                // Перейти на следующую итерацию
+//                // Go to the next iteration
 //                continue;
 //        }
 		
         /// !!!! Вывести изображение
         /// //TODO:
  //       m_poImageDisplay->displayImage( "MyVideo", image.data );
-        // Вывести изображение
+        // Output the image
         Util::displayImage( "MyVideo", image.data );
 
-        //Обработать новое изображение
+        // Process a new image
         newImageCallback( image.data, image.timestamp );
 
         //m_poImageDisplay->waitKey( 500 );
@@ -144,20 +145,20 @@ void LiveSLAMWrapper::Loop()
 
 void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
 {
-    // Увеличить счетчик
+    // Increment the counter 
 	++ imageSeqNumber;
 
 	// Convert image to grayscale, if necessary
     /// **** Я ЭТО СДЕЛАЛ НА УРОВНЕ КАМЕРЫ !!!!!!!!! *********
-    // Преобразовать изображение в чернобелое
+    // Transform an image to greyscale
 	cv::Mat grayImg;
 
-    // Проверить количество каналов
+    // Check the amount of canals
     if ( img.channels() == 1 )
-        // Просто присваиваем
+        // Just assigning 
 		grayImg = img;
 	else
-        // Преобразовуем
+        // Transforming
         cvtColor( img, grayImg, CV_RGB2GRAY );
 	
 	// Assert that we work with 8 bit images
@@ -165,17 +166,17 @@ void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
     assert( fx != 0 || fy != 0 );
 
     /// START SLAM !!!!!!!!!!!!
-    // need to initialize
-    // Еще не инициализирован
+    // Need to initialize
+    // Not initialized yet
     if( !isInitialized && m_poMonoOdometry != nullptr )
     {
-        // Случайная инициализация
+        // Random initialization
         m_poMonoOdometry->randomInit( grayImg.data, imgTime.toSec(), 1 );
 
-        // Отметить инициализацию
+        // Make a note of the initialization 
         isInitialized = true;
     }
-    // Если прошла инициализация и указатель на SLAM существует
+    // If initialization is successful and SLAM pointer exists 
     else if( isInitialized && m_poMonoOdometry != nullptr )
     {
         m_poMonoOdometry->trackFrame(   grayImg.data    ,

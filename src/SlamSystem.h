@@ -70,21 +70,44 @@ public:
 //******************************************************************************
 //****************** Конструктор / Дисруктор ***********************************
 
+    /**
+     * @brief SlamSystem
+     *
+     * Constructor.
+     */
     SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM = true );
-    SlamSystem( const SlamSystem& ) = delete;
 
+    /**
+     * @brief SlamSystem
+     *
+     * Constructor.
+     */
+    SlamSystem( const SlamSystem& ) = delete;
     SlamSystem& operator=(const SlamSystem&) = delete;
 
+    /**
+     * @brief ~SlamSystem()
+     *
+     * Destructor.
+     */
     ~SlamSystem();
 
 private:
-    // used only on destruction to signal threads to finish.
+
+    /// Used only before destruction to notify threads to finish.
     bool keepRunning;
 
 //******************************************************************************
 //*********** Функиции инициализации / завершения ******************************
+
 public:
-    // Начальная инициализация ??
+
+    /**
+     * @brief Initial initialization.
+     * @param image
+     * @param timeStamp
+     * @param id
+     */
     void randomInit ( uchar* image, double timeStamp, int id );
 
     // Почиму-то нигде не используется ( может быть для обработки изиображений ?? )
@@ -94,27 +117,42 @@ public:
     // finalizes the system, i.e. blocks and does all remaining loop-closures etc.
 //    void finalize();
 
-    /** Sets the visualization where point clouds and camera poses will be sent to. */
+    /**
+     * @brief Sets the visualization where point clouds and camera poses will be sent to.
+     * @param outputWrapper
+     */
     void setVisualization( Output3DWrapper* outputWrapper );
 
 private:
 
 //******************************************************************************
 //************************ Работа с KayFrame ***********************************
+
 public:
-    // Вызвается при полуении нового кадра
-	// tracks a frame.
-	// first frame will return Identity = camToWord.
-	// returns camToWord transformation of the tracked frame.
-	// frameID needs to be monotonically increasing.
+    /**
+     * @brief trackFrame
+     *
+     *  Called after receieving a new frame
+     *  Tracks a frame,
+     *  First frame will return Identity = camToWord,
+     *  Returns camToWord transformation of the tracked frame,
+     *  frameID needs to be monotonically increasing.
+     *
+     * @param image
+     * @param frameID
+     * @param blockUntilMapped
+     * @param timestamp
+     */
     void trackFrame(    uchar*          image               ,
                         unsigned int    frameID             ,
                         bool            blockUntilMapped    ,
                         double          timestamp               );
 
-
-    // Возвращает указатель на текущий кадр
-    // not thread-safe!
+    /**
+     * @brief getCurrentKeyframe
+     * @warning (Not thread-safe)
+     * @return Returns the pointer to the current frame
+     */
     inline Frame* getCurrentKeyframe() { return currentKeyFrame.get();}
 
 private:
@@ -130,74 +168,95 @@ private:
     void loadNewCurrentKeyframe(Frame* keyframeToLoad);
 
 private:
-    //                  SET & READ EVERYWHERE
-    // changed (and, for VO, maybe deleted)
-    // only by Mapping thread within exclusive lock.
+
+    /// SET & READ EVERYWHERE. Changed (and, for VO, maybe deleted). Only by Mapping thread within exclusive lock.
     std::shared_ptr<Frame>      currentKeyFrame;
-    // only used in odometry-mode, to keep a keyframe alive until it is deleted.
-    // ONLY accessed whithin currentKeyFrameMutex lock.
+
+    /// Only used in odometry-mode, to keep a Key Frame alive until it is deleted. Only accessed within currentKeyFrameMutex lock.
     std::shared_ptr<Frame>      trackingReferenceFrameSharedPT;
     boost::mutex                currentKeyFrameMutex;
 
-    // PUSHED in tracking, READ & CLEARED in mapping
-    // Массив "не привязанных" кадров
+    /// Pushed in tracking, READ & CLEARED in mapping. Array of "unattached" frames.
     std::deque< std::shared_ptr<Frame> >    unmappedTrackedFrames;
-    // Мютекс для защиты этих фремов
+
+    /// Mutex to protect these frames.
     boost::mutex                            unmappedTrackedFramesMutex;
-    // Сообщает о каких то изменениях
+
+    /// Notifies about some changes.
     boost::condition_variable               unmappedTrackedFramesSignal;
 
     //**************************************************************************
     //************************ Работа с Mapping ********************************
+
 public:
-    // Основная функция Mapping
+
+    /**
+     * @brief Main Mapping function
+     *
+     * @return
+     */
     bool doMappingIteration();
 
 private:
-    // Функция потока картирования
+
+    /**
+     * @brief mappingThreadLoop
+     *
+     * Function of mapping thread.
+     */
     void mappingThreadLoop();
 
     void debugDisplayDepthMap();
 
-    /** Merges the current keyframe optimization offset to all working entities. */
+    /**
+     * @brief mergeOptimizationOffset
+     *
+     * Merges the current keyframe optimization offset to all working entities.
+     */
     void mergeOptimizationOffset();
 
     void addTimingSamples();
     void takeRelocalizeResult();
 
 private:
-    // ============= EXCLUSIVELY MAPPING THREAD (+ init) ======================
+
+    /// EXCLUSIVELY MAPPING THREAD (+ init).
     DepthMap*               map;
     TrackingReference*      mappingTrackingReference;
 
-    // during re-localization used
+    /// During re-localization used.
     std::vector<Frame*> 	KFForReloc;
     int 					nextRelocIdx;
     std::shared_ptr<Frame> 	latestFrameTriedForReloc;
 
-    // Дискриптор потока картирования
+    /// Handle of mapping thread.
     boost::thread   thread_mapping;
 
-    // Флаг необходимости вывода карты глубин
+    /// Flag of necessity for Depth map output.
     bool            depthMapScreenshotFlag;
-    // Имя файла для вывода
+
+    /// Name for a file for output.
     std::string     depthMapScreenshotFilename;
 
-    // USED DURING RE-LOCALIZATION ONLY
+    /// USED DURING RE-LOCALIZATION ONLY.
     Relocalizer relocalizer;
 
 //******************************************************************************
 // ******************** Работа с Optimization **********************************
+
+
 public:
-    // Время итерации в миллисекундах
+
+    /// Time of iteration in milliseconds.
     float   msOptimizationIteration;
-    // Количество итераций
+
+    /// Amount of iterations.
     int     nOptimizationIteration;
 
     // ????
     float   nAvgOptimizationIteration;
 
-    // Флаг оптимизации
+    /// Flag of optimization.
     bool 	doFinalOptimization;
 
 public:
@@ -208,11 +267,17 @@ private:
     boost::thread thread_optimization;
 
 private:
-    // Функция потока оптимизации
+
+    /**
+     * @brief optimizationThreadLoop
+     *
+     * Function of optimization thread.
+     */
     void optimizationThreadLoop();
 
 //******************************************************************************
 // ********************* Работа с Сonatraint ***********************************
+
 public:
     float   msFindConstraintsItaration;
     int     nFindConstraintsItaration;
@@ -226,7 +291,8 @@ public:
 //                                        float   closeCandidatesTH   = 1.0       );
 
 private:
-    // ============= EXCLUSIVELY FIND-CONSTRAINT THREAD (+ init) =============
+
+    // === EXCLUSIVELY FIND-CONSTRAINT THREAD (+ init) ===
     TrackableKeyFrameSearch* 	trackableKeyFrameSearch;
 
     Sim3Tracker* 				constraintTracker;
@@ -240,7 +306,12 @@ private:
     int                         lastNumConstraintsAddedOnFullRetrack;
 
 private:
-    // Функция потока
+
+    /**
+     * @brief constraintSearchThreadLoop
+     *
+     * Function of a thread.
+     */
     void constraintSearchThreadLoop();
 
     // Я коментил
@@ -250,9 +321,9 @@ private:
 //                            Sim3                candidateToFrame_initialEstimate,
 //                            float               strictness                        );
 
-    /** Calculates a scale independent error norm for reciprocal tracking results
-     *  a and b with associated information matrices.
-    */
+//    /** Calculates a scale independent error norm for reciprocal tracking results
+//     *  a and b with associated information matrices.
+//    */
     // Тоже я
 //    float tryTrackSim3( TrackingReference* A        ,
 //                        TrackingReference* B        ,
@@ -280,62 +351,71 @@ public:
     float   nAvgTrackFrame;
     float   nAvgFindReferences;
 
-    // Контроль частоты обновления ????
+    /// Control of frequency update
     struct timeval lastHzUpdate;
 
 private:
 
-	// ============= EXCLUSIVELY TRACKING THREAD (+ init) ===============
-    // tracking reference for current keyframe. only used by tracking.
+    // ============= EXCLUSIVELY TRACKING THREAD (+ init) ===============
+    ///  Tracking reference for current keyframe. Only used by tracking.
     TrackingReference*	trackingReference;
     SE3Tracker* 		tracker;
 
-	// ============= SHARED ENTITIES =============
-	float tracking_lastResidual;
-	float tracking_lastUsage;
+    // ============= SHARED ENTITIES ============= */
+    float tracking_lastResidual;
+    float tracking_lastUsage;
 	float tracking_lastGoodPerBad;
     float tracking_lastGoodPerTotal;
 
     float lastTrackingClosenessScore;
 
-	// for sequential operation. Set in Mapping, read in Tracking.
+    /// For sequential operation. Set in Mapping, read in Tracking.
 	boost::condition_variable  	newFrameMappedSignal;
 	boost::mutex 				newFrameMappedMutex;
 
-	// Individual / no locking
-    Output3DWrapper*	outputWrapper;		// no lock required
+    // Individual / no locking
+    /// No lock required
+    Output3DWrapper*	outputWrapper;
 
-    KeyFrameGraph* 		keyFrameGraph;		// has own locks
+    /// Has own locks
+    KeyFrameGraph* 		keyFrameGraph;
 
-    // Tracking:    if (!create) set candidate, set     create.
-    // Mapping:     if (create ) use candidate, reset   create.
-	// => no locking required.
+
+    /**
+     *  Tracking:    if (!create) set candidate, set     create.
+     *  Mapping:     if (create ) use candidate, reset   create.
+     *  => no locking required.
+     */
     std::shared_ptr<Frame>      latestTrackedFrame;
     bool                        createNewKeyFrame;
 
-	// PUSHED by Mapping, READ & CLEARED by constraintFinder
+    /// PUSHED by Mapping, READ & CLEARED by constraintFinder
     std::deque< Frame* >        newKeyFrames;
     boost::mutex                newKeyFrameMutex;
     boost::condition_variable   newKeyFrameCreatedSignal;
 
-	// optimization thread
+    /// Optimization thread
     bool                        newConstraintAdded;
     boost::mutex                newConstraintMutex;
     boost::condition_variable   newConstraintCreatedSignal;
     boost::mutex                g2oGraphAccessMutex;
 
-	// optimization merging. SET in Optimization, merged in Mapping.
+    /// optimization merging. SET in Optimization, merged in Mapping.
 	bool haveUnmergedOptimizationOffset;
 
-	// mutex to lock frame pose consistency. within a shared lock of this, *->getScaledCamToWorld() is
-	// GUARANTEED to give the same result each call, and to be compatible to each other.
-	// locked exclusively during the pose-update by Mapping.
-	boost::shared_mutex poseConsistencyMutex;
+
+    /// Mutex to lock frame pose consistency. within a shared lock of this, *->getScaledCamToWorld() is
+    /// GUARANTEED to give the same result each call, and to be compatible to each other.
+    /// locked exclusively during the pose-update by Mapping.
+    boost::shared_mutex poseConsistencyMutex;
 
     //************************ Непонятно что ***************************
 public:
-    // settings. Constant from construction onward.
+
+    /// Settings. Constant from construction onward.
     int width;
+
+    /// Settings. Constant from construction onward.
     int height;
 
     Eigen::Matrix3f K;
@@ -345,7 +425,7 @@ public:
     bool        trackingIsGood;
 
 public:
-    /** Does an offline optimization step. */
+//    /** Does an offline optimization step. */
     // Почиму-то нигде не используется ( может быть для обработки изиображений ?? )
 //    void optimizeGraph();
 
@@ -354,11 +434,11 @@ private:
     // Нигде не вызывается
     void requestDepthMapScreenshot( const std::string& filename );
 
-    /** Returns the current pose estimate. */
+//    /** Returns the current pose estimate. */
 //    SE3 getCurrentPoseEstimate();
 //    std::vector<FramePoseStruct*, Eigen::aligned_allocator<lsd_slam::FramePoseStruct*> > getAllPoses();
 
-    // It was in settings.h
+    /// It was in settings.h
     bool displayDepthMap;
 };
 
