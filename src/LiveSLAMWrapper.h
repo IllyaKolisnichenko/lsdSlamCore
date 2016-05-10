@@ -49,7 +49,7 @@ class InputImageStream;
 //class SLAMImageDisplay;
 class Timestamp;
 
-// Обертка для SlamSystem
+/** Wrapper for SlamSystem */
 class LiveSLAMWrapper //: public Notifiable
 {
 
@@ -58,46 +58,74 @@ class LiveSLAMWrapper //: public Notifiable
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    // Конструктор
+    /**
+     * @brief LiveSLAMWrapper
+     *
+     * Constructor.
+     *
+     * @param videoFilePath
+     * @param unditorFilePath
+     */
     LiveSLAMWrapper(const char* videoFilePath, const char* unditorFilePath);
 
 	/** Destructor. */
 	~LiveSLAMWrapper();
 	
 	
-	/** Runs the main processing loop. Will never return. */
+    /**
+     * @brief Loop
+     *
+     * Runs the main processing loop. Will never return.
+     */
 	void Loop();
 	
-	/** Requests a reset from a different thread. */
+    /**
+     * @brief requestReset
+     *
+     * Requests a reset from a different thread.
+     */
 	void requestReset();
 	
-	/** Resets everything, starting the odometry from the beginning again. */
+    /**
+     * @brief resetAll
+     *
+     * Resets everything, starting the odometry from the beginning again.
+     */
 	void resetAll();
 
-	/** Callback function for new RGB images. */
+    /**
+     * @brief newImageCallback
+     *
+     * Callback function for new RGB images.
+     *
+     * @param img
+     * @param imgTime
+     */
 	void newImageCallback(const cv::Mat& img, Timestamp imgTime);
 
-	/** Writes the given time and pose to the outFile. */
+//	/** Writes the given time and pose to the outFile. */
 //	void logCameraPose(const SE3& camToWorld, double time);
 	
-    // Возвращает указатель на объект SlamSystem
+    // Returns the pointer to the SlamSystem object
 //    inline SlamSystem* getSlamSystem() {return m_poMonoOdometry;}
 
     void detectAndDraw(cv::Mat &image);
 private:
-    // Указатели на объекты входного и выходного потока
+    /// Pointer to the object of input thread
     InputImageStream*   m_poImageStream;
+
+    /// Pointer to the object of output thread
     Output3DWrapper*    m_poOutputWrapper;
 
     // Object for Image Dispaly
  //   SLAMImageDisplay*   m_poImageDisplay;
 
-	// initialization stuff
+    /// Initialization stuff
     bool    isInitialized;
 
     bool    m_bDoSlam;
 
-	// monoOdometry
+    /// MonoOdometry
     SlamSystem*     m_poMonoOdometry;
 
     std::string     outFileName;

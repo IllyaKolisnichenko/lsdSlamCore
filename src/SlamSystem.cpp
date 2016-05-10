@@ -21,6 +21,7 @@
 #include "SlamSystem.h"
 
 #include "DataStructures/Frame.h"
+//#include "DataStructures/FrameMemory.h"
 
 #include "DepthEstimation/DepthMap.h"
 
@@ -33,9 +34,12 @@
 #include "GlobalMapping/KeyFrameGraph.h"
 
 #include "GlobalMapping/TrackableKeyFrameSearch.h"
+//#include "GlobalMapping/g2oTypeSim3Sophus.h"
 
 #include "ImageDisplay.h"
 #include "Output3DWrapper/myoutput3dwrapper.h"
+
+//#include <g2o/core/robust_kernel_impl.h>
 
 #include "deque"
 
@@ -51,38 +55,38 @@
 
 using namespace lsd_slam;
 
-// Конструктор
+// Constructor
 SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
     SLAMEnabled		( enableSLAM	),
     displayDepthMap (   true        ),
     relocalizer     ( w,h,K			)
 {
-	// Стороны картинок должны быть кратны 16
+    // The sides of an image must be divisible by 16
 	if(w%16 != 0 || h%16!=0)
 	{
-		// Вывести сообщение
+        // Output the image
 		printf("image dimensions must be multiples of 16! Please crop your images / video accordingly.\n");
-		// Прекратить обработку
+        // Stop processing
 		assert(false);
 	}
 
-	// Установить параметры камеры
+    // Set the parameters of the camera
 	this->width 	= w;
 	this->height 	= h;
 	this->K 		= K;
 
-    // C трекингом все хорошо по умолчанию
+    // Tracking is good by default
 	trackingIsGood 	= true;
 
 	currentKeyFrame 				= nullptr;
 	trackingReferenceFrameSharedPT	= nullptr;
 
-    // Craete new graph
+    // Craete a new graph
     keyFrameGraph 					= new KeyFrameGraph();
 
 	createNewKeyFrame 				= false;
 
-    // Создаем экземпляр карты глубины
+    // Create an instance of the depth map
     map =  new DepthMap( this->width,
                          this->height,
                          this->K        );
@@ -90,7 +94,7 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
 	newConstraintAdded 				= false;
 	haveUnmergedOptimizationOffset 	= false;
 
-    // Создаем экземпляр трекера
+    // Create an instance of the tracker
     tracker = new SE3Tracker( this->width,
                               this->height,
                               this->K       );
@@ -138,20 +142,24 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
 	depthMapScreenshotFlag 		= false;
 	lastTrackingClosenessScore 	= 0;
 
-    // Запускаем функцию картирования в новом потоке
+    // Run the mapping function in a new Thread
     // thread_mapping = boost::thread(&SlamSystem::mappingThreadLoop, this);
 
     if( SLAMEnabled )
 	{
-//        thread_constraint_search    = boost::thread(&SlamSystem::constraintSearchThreadLoop,    this);
-//        thread_optimization         = boost::thread(&SlamSystem::optimizationThreadLoop,        this);
+        // The thread of renewal of constraints
+//      thread_constraint_search    = boost::thread(&SlamSystem::constraintSearchThreadLoop,    this);
+        // The thread of optimization
+        //      thread_optimization         = boost::thread(&SlamSystem::optimizationThreadLoop,        this);
 	}
 
+    // Additional threads run only if SLAM is turned ON
 	msTrackFrame 				= 0;
 	msOptimizationIteration 	= 0;
 	msFindConstraintsItaration	= 0;
 	msFindReferences 			= 0;
 
+    // mapping ThreadLoop run in any case
 	nTrackFrame 				= 0;
 	nOptimizationIteration		= 0;
 	nFindConstraintsItaration	= 0;
@@ -170,7 +178,7 @@ SlamSystem::~SlamSystem()
 {
 	keepRunning = false;
 
-	// make sure none is waiting for something.
+    // Make sure none is waiting for something.
 	printf("... waiting for SlamSystem's threads to exit\n");
 
 	newFrameMappedSignal.notify_all();
@@ -203,14 +211,14 @@ SlamSystem::~SlamSystem()
     delete trackingReference;
     delete tracker;
 
-	// make shure to reset all shared pointers to all frames before deleting the keyframegraph!
+    // Make shure to reset all shared pointers to all frames before deleting the keyframegraph!
 	unmappedTrackedFrames.clear();
 	latestFrameTriedForReloc.reset();
 	latestTrackedFrame.reset();
 	currentKeyFrame.reset();
 	trackingReferenceFrameSharedPT.reset();
 
-	// delte keyframe graph
+    // Delete keyframe graph
     delete keyFrameGraph;
 
 	FrameMemory::getInstance().releaseBuffes();
@@ -225,9 +233,10 @@ void SlamSystem::setVisualization(Output3DWrapper* outputWrapper)
 
 void SlamSystem::mergeOptimizationOffset()
 {
-	// update all vertices that are in the graph!
+    // Update all vertices that are in the graph!
 	poseConsistencyMutex.lock();
 
+    // Do we need to publish(visualize) ???
 	bool needPublish = false;
 	if(haveUnmergedOptimizationOffset)
     {
@@ -246,37 +255,38 @@ void SlamSystem::mergeOptimizationOffset()
         publishKeyframeGraph();
 }
 
-void SlamSystem::mappingThreadLoop()
+void SlamSystem::mappingThreadLoop() // Works independent from tracking
 {
-    // Сообщить о запуске птока
+    // Notify about launching of the thread
     printf("Started mapping thread!\n");
 
-    // Пока флаг запуска установлен
-    // Флаг сбрасывается только в диструкторе для остановки потоков
+    // Until the flag of launching is TRUE
+    // Flag is set to FALSE only in destructor for stopping the threads
     while(keepRunning)
     {
-        // Выполнить следующую итерацию
+        // Do the next iteration
         bool mappingResult = doMappingIteration();
-        // Если она не удачная
+        // If it was unsuccessful
         if (!mappingResult)
         {
-            // Заблокировать мютекс
+            // Lock the mutex
             boost::unique_lock<boost::mutex> lock( unmappedTrackedFramesMutex );
 
-            // Ждем сообщения от мютекса
+            // Waiting for a message from the mutex
             unmappedTrackedFramesSignal.timed_wait( lock,
-                                                    boost::posix_time::milliseconds(200)    );	// slight chance of deadlock otherwise
-            // Отпустить мютекс
+                                                    boost::posix_time::milliseconds(200)    );	// Slight chance of deadlock otherwise
+            // Unlock the mutex
             lock.unlock();
         }
 
-        // Опять чего то ждем !!!! ????
+        // Notify trackFrame that iteration is finished
         newFrameMappedMutex.lock();
+        // Notify that iteration of mapping is finished
         newFrameMappedSignal.notify_all();
         newFrameMappedMutex.unlock();
     }
 
-    // Выйти из цикла картирования
+    // Quit from the mapping loop
     printf("Exited mapping thread \n");
 }
 
@@ -322,28 +332,28 @@ void SlamSystem::mappingThreadLoop()
 //}
 
 // Проверил - можно просто расскоментировать
-//void SlamSystem::constraintSearchThreadLoop()
+//void SlamSystem::constraintSearchThreadLoop() // Changing of the constraints
 //{
 //	printf("Started  constraint search thread!\n");
 
-//	boost::unique_lock<boost::mutex> lock(newKeyFrameMutex);
+//	boost::unique_lock<boost::mutex> lock(newKeyFrameMutex); // Declare the buffer of new "unprocessed" KF's
 
-//	int failedToRetrack = 0;
+//	int failedToRetrack = 0;    // Counter
 
-//	while(keepRunning)
+//  while(keepRunning)          // While working
 //	{
-//		if(newKeyFrames.size() == 0)
+//		if(newKeyFrames.size() == 0)    // If the buffer is empty
 //		{
-//			lock.unlock();
+//			lock.unlock();              // Unlock
 
-//            keyFrameGraph->keyframesForRetrackMutex.lock();
+//            keyFrameGraph->keyframesForRetrackMutex.lock();   // Block the data
 
 //            bool doneSomething = false;
 
-//            if(keyFrameGraph->keyframesForRetrack.size() > 10)
+//            if(keyFrameGraph->keyframesForRetrack.size() > 10) // For a buffer that is more than 10
 //            {
 //                std::deque< Frame* >::iterator toReTrack = keyFrameGraph->keyframesForRetrack.begin() + (rand() % (keyFrameGraph->keyframesForRetrack.size()/3));
-//                Frame* toReTrackFrame = *toReTrack;
+//                Frame* toReTrackFrame = *toReTrack;   // Random frame 1 of 10
 
 //                keyFrameGraph->keyframesForRetrack.erase(toReTrack);
 //                keyFrameGraph->keyframesForRetrack.push_back(toReTrackFrame);
@@ -351,39 +361,43 @@ void SlamSystem::mappingThreadLoop()
 //                keyFrameGraph->keyframesForRetrackMutex.unlock();
 
 //                int found = findConstraintsForNewKeyFrames(toReTrackFrame, false, false, 2.0);
-//                if(found == 0)
-//                    failedToRetrack++;
+//                if(found == 0)    // Nothing is found
+//                    failedToRetrack++;    // Increment the counter
 //                else
-//                    failedToRetrack=0;
+//                    failedToRetrack=0;    // Null the counter
 
 //                if(failedToRetrack < (int)keyFrameGraph->keyframesForRetrack.size() - 5)
 //                    doneSomething = true;
 //            }
 //            else
-//                keyFrameGraph->keyframesForRetrackMutex.unlock();
+//                keyFrameGraph->keyframesForRetrackMutex.unlock(); // Unlock the data
 
 //            lock.lock();
 
-//            if(!doneSomething)
+//            if(!doneSomething)    // If nothing to do
 //            {
 //                if(enablePrintDebugInfo && printConstraintSearchInfo)
 //                    printf("nothing to re-track... waiting.\n");
-//                newKeyFrameCreatedSignal.timed_wait(lock,boost::posix_time::milliseconds(500));
+//                newKeyFrameCreatedSignal.timed_wait(lock,boost::posix_time::milliseconds(500)); // Output the debugging information and put to sleep the tread for 500ms
 
 //            }
 //        }
 //		else
 //		{
-//			Frame* newKF = newKeyFrames.front();
+//          // Receive the first frame
+//			Frame* newKF = newKeyFrames.front();`
 //			newKeyFrames.pop_front();
 //			lock.unlock();
 
+//          // Counting time
 //			struct timeval tv_start, tv_end;
 //			gettimeofday(&tv_start, NULL);
 
 //			findConstraintsForNewKeyFrames(newKF, true, true, 1.0);
 //			failedToRetrack=0;
 //			gettimeofday(&tv_end, NULL);
+
+//          // Time for searching the constraints
 //			msFindConstraintsItaration = 0.9*msFindConstraintsItaration + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 //			nFindConstraintsItaration++;
 
@@ -400,11 +414,11 @@ void SlamSystem::mappingThreadLoop()
 //            for(unsigned int i=0;i<keyFrameGraph->keyframesAll.size();i++)
 //            {
 //                if(keyFrameGraph->keyframesAll[i]->pose->isInGraph)
-//                    added += findConstraintsForNewKeyFrames(keyFrameGraph->keyframesAll[i], false, false, 1.0);
+//                    added += findConstraintsForNewKeyFrames(keyFrameGraph->keyframesAll[i], false, false, 1.0); // Page 25
 //            }
 
 //			printf("Done optizing Full Map! Added %d constraints.\n", added);
-
+//          // Who is setting it to TRUE ???
 //			doFullReConstraintTrack = false;
 
 //			lastNumConstraintsAddedOnFullRetrack = added;
@@ -415,43 +429,45 @@ void SlamSystem::mappingThreadLoop()
 //	printf("Exited constraint search thread \n");
 //}
 
+// The thread of optimization
 void SlamSystem::optimizationThreadLoop()
 {
-    // Сообщить о запуске потока
+    // Notify that thread is launched
 	printf("Started optimization thread \n");
 
-    // Пока работаем
+    // While working
     while( keepRunning )
 	{
-        // Захватываем поток
+        // Catching the thread
 		boost::unique_lock<boost::mutex> lock(newConstraintMutex);
 
-        // Если не добавляли новых ограничений
+        // If new constraints aren't added
         if( !newConstraintAdded )
-            // slight chance of deadlock otherwise
-            // Проверить, вдруг добавили
+            // Slight chance of deadlock otherwise
+            // Check if new constraints are added
             newConstraintCreatedSignal.timed_wait( lock, boost::posix_time::milliseconds(2000) );
 
-        // Если, все таки добавили - отметить, что обработано
+        // If new constraints are added than notify that processed
         newConstraintAdded = false;
 
-        // Отпустить поток
+        // Unlock the thread
 		lock.unlock();
 
-        // Делаем финальную оптимизацию
+        // Doing the final optimization
+        // To do: find a place where flag is set to TRUE
         if( doFinalOptimization )
 		{
-            // Сообщаем об этом
+            // Notify about this
 			printf("doing final optimization iteration!\n");
 
-            // Непосредственно отимизация
+            // Directly optimization
             // optimizationIteration(50, 0.001);
 
-            // Сбрасываем флаг
+            // Set the flag to FALSE
 			doFinalOptimization = false;
 		}
 
-        // Тонкая оптимизация
+        // High accuracy optimization
         // while( optimizationIteration(5, 0.02) );
 	}
 
@@ -624,46 +640,44 @@ void SlamSystem::changeKeyframe(bool noCreate, bool force, float maxScore)
 
 bool SlamSystem::updateKeyframe()
 {
-    // for what? never used?
-    // std::shared_ptr<Frame> reference = nullptr;
 
     // Make new list of shared ptr
     std::deque< std::shared_ptr<Frame> > references;
 
-    // Block list
+    // Block list (block an access to the buffer of frames)
     unmappedTrackedFramesMutex.lock();
 
-    // remove frames that have a different tracking parent.
-    //          List mast be not
+    // Remove frames that have a different tracking parent
+    // Until the queue is not empty (more than 0)
     while(       unmappedTrackedFrames.size() > 0                   &&
-                // if first element have no parent (did not processed by SE3Tracker::TrackFrame)
+                // If first element doesn't have a parent (wasn't processed by SE3Tracker::TrackFrame)
             (   !unmappedTrackedFrames.front()->hasTrackingParent() ||
                 // or have different parent KeyFrame
                  unmappedTrackedFrames.front()->getTrackingParent() != currentKeyFrame.get() )   )
     {
-        // Clear data
+        // Delete data (clearing the memory)
         unmappedTrackedFrames.front()->clear_refPixelWasGood();
         // Delete element from list
         unmappedTrackedFrames.pop_front();
     }
 
-    // clone list
-    // If list still not empty
+    // Clone the list
+    // If list is still not empty
     if( unmappedTrackedFrames.size() > 0 )
     {
-        // Copy list
-        // For all elements in list
+        // Copy the list
+        // For all the elements in the list
         for(unsigned int i = 0; i < unmappedTrackedFrames.size(); i++)
-            // Copy element
+            // Copy the element
             references.push_back( unmappedTrackedFrames[i] );
 
-        // Receive pointer to first element
+        // Receive pointer to the first element
         std::shared_ptr<Frame> popped = unmappedTrackedFrames.front();
 
-        // Delete first element from list
+        // Delete first element from the list
         unmappedTrackedFrames.pop_front();
 
-        // Unblock list
+        // Unblock the list
         unmappedTrackedFramesMutex.unlock();
 
         // Print debug info
@@ -680,18 +694,18 @@ bool SlamSystem::updateKeyframe()
         // Clear some data ???
         popped->clear_refPixelWasGood();
 
-        // Clear teporary list
+        // Clear temporary list
         references.clear();
     }
     else
     {
         // Unblock list
         unmappedTrackedFramesMutex.unlock();
-        // return
+        // Return
         return false;
     }
 
-    // Publish debug information
+    // Publish debugging information
     if( enablePrintDebugInfo        &&
         printRegularizeStatistics       )
     {
@@ -717,7 +731,7 @@ bool SlamSystem::updateKeyframe()
         outputWrapper->publishDebugInfo(data);
     }
 
-    // If all OK
+    // If everything is OK
     if( outputWrapper != 0  &&
         continuousPCOutput  &&
         currentKeyFrame != 0        )
@@ -729,6 +743,7 @@ bool SlamSystem::updateKeyframe()
 
 void SlamSystem::addTimingSamples()
 {
+    // Add time mark
     map->addTimingSample();
 
     struct timeval now;
@@ -770,10 +785,10 @@ void SlamSystem::addTimingSamples()
 
         lastHzUpdate = now;
 
-        // Если включен вывод отладочной информации
+        // If output of the debugging information is turned ON
         if(enablePrintDebugInfo && printOverallTiming)
         {
-            // Вывести отладочную информацию
+            // Output of the debugging information
             printf("MapIt: %3.1fms (%.1fHz); Track: %3.1fms (%.1fHz); Create: %3.1fms (%.1fHz); FindRef: %3.1fms (%.1fHz); PermaTrk: %3.1fms (%.1fHz); Opt: %3.1fms (%.1fHz); FindConst: %3.1fms (%.1fHz);\n",
                     map->msUpdate,
                     map->nAvgUpdate,
@@ -795,7 +810,7 @@ void SlamSystem::addTimingSamples()
 
 void SlamSystem::debugDisplayDepthMap()
 {
-    // Prepera data for visualization
+    // Prepare data for visualization
     map->debugPlotDepthMap();
 
     double scale = 1;
@@ -803,7 +818,7 @@ void SlamSystem::debugDisplayDepthMap()
     if( currentKeyFrame != 0 )
          scale = currentKeyFrame->getScaledCamToWorld().scale();
 
-    // debug plot depthmap
+    // Debug plot depthmap
     char buf1[200];
     char buf2[200];
 
@@ -890,24 +905,26 @@ void SlamSystem::takeRelocalizeResult()
     }
 }
 
+// Called in a function of the appropriate thread
 bool SlamSystem::doMappingIteration()
 {
-    // Если текущий кадр не установлен
+    // If current frame is not set
     if(currentKeyFrame == 0)
+        // Return error
         return false;
 
-    // Если не нужно делать картирование и параметр еще не менялся
+    // If no need to do mapping and parameter is still not changed
     if( !doMapping && currentKeyFrame->idxInKeyframes < 0 )
     {
-        // Если количество кадров, обработанных в этой выборке больше либо равно заданному
+        // If the amount of frames processed in this selection is MORE or EQUAL to given
         if( currentKeyFrame->numMappedOnThisTotal >= MIN_NUM_MAPPED )
-            // Закончить ключивой кадр
+            // Finish the Key Frame
             finishCurrentKeyframe();
         else
-            // Отбросить ключевой кадр
+            // Discard the Key Frame
             discardCurrentKeyframe();
 
-        // Что то сбросить
+        // Something to discard
         map->invalidate();
 
         // Сообщить об окончании формирования ключевого кадра с номером
@@ -917,10 +934,10 @@ bool SlamSystem::doMappingIteration()
         changeKeyframe(true, true, 1.0f);
     }
 
-    // need for update change after optimization thread iteration done
+    // Need to update changes after iteration of thread optimization is done
     mergeOptimizationOffset();
 
-    // debugin info
+    // For debugging information
     addTimingSamples();
 
     if( dumpMap )
@@ -929,10 +946,10 @@ bool SlamSystem::doMappingIteration()
         dumpMap = false;
     }
 
-    // set mappingFrame
-    if(trackingIsGood)
+    // Set mappingFrame
+    if(trackingIsGood) // Find the reasons of changing
     {
-        if(!doMapping)
+        if(!doMapping) // If don't need to do
         {
             //printf("tryToChange refframe, lastScore %f!\n", lastTrackingClosenessScore);
             if(lastTrackingClosenessScore > 1)
@@ -944,6 +961,7 @@ bool SlamSystem::doMappingIteration()
             return false;
         }
 
+        // If tracking is OK and doMapping is set to FALSE next part isn't performed
         if (createNewKeyFrame)
         {
             finishCurrentKeyframe();
@@ -968,8 +986,8 @@ bool SlamSystem::doMappingIteration()
     }
     else
     {
-        // invalidate map if it was valid.
-        if(map->isValid())
+        // Invalidate the map if it was valid
+        if(map->isValid()) // Depth map
         {
             if(currentKeyFrame->numMappedOnThisTotal >= MIN_NUM_MAPPED)
                 finishCurrentKeyframe();
@@ -979,11 +997,11 @@ bool SlamSystem::doMappingIteration()
             map->invalidate();
         }
 
-        // start relocalizer if it isnt running already
+        // Start relocalizer if it isn't already running
         if(!relocalizer.isRunning)
             relocalizer.start(keyFrameGraph->keyframesAll);
 
-        // did we find a frame to relocalize with?
+        // Did we find a frame to relocalize with?
         if( relocalizer.waitResult(50) )
             takeRelocalizeResult();
 
@@ -1019,59 +1037,67 @@ bool SlamSystem::doMappingIteration()
 //	printf("Done GT initialization!\n");
 //}
 
+// Initialization of the first Key Frame
 void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
 {
-    // Сообщить о начале инициализации
+    // Notify that initialization is started
     printf("Doing Random initialization!\n");
 
-    // Если параметр отключен
+    // If the parameter is OFF
     if( !doMapping )
-        // Сообщить об этом
+        // Notify about it
         printf("WARNING: mapping is disabled, but we just initialized... THIS WILL NOT WORK! Set doMapping to true.\n");
 
-    // Блокирует доступ к текущему ключевому кадру
+    // Lock an access to the current Key Frame
     currentKeyFrameMutex.lock();
 
-    // Создать новый кадр и сбросить ( reset заместит существующий указатель )
+    // Create a new frame and reset ( "reset" will replace existing pointer)
     currentKeyFrame.reset( new Frame( id, width, height, K, timeStamp, image ) );
 
-    // Инициализировать карту глубин
+    // Initialize the depth map
     map->initializeRandomly( currentKeyFrame.get() );
 
-    // Добавить ключевой кадр в граф
+    // Add the Key Frame to the graph
+    // Save the position of the frame "pose" in the list
     keyFrameGraph->addFrame( currentKeyFrame.get() );
 
-    // Отпустить поток
+    // Unlock the thread
     currentKeyFrameMutex.unlock();
 
-    // Что то не понятное...
+    // Smth unknown...
     if( SLAMEnabled )
     {
-        // Блокируем поток
+        // Lock the thread
+        // Add the frame connected with Id to the list
         keyFrameGraph->idToKeyFrameMutex.lock();
 
         keyFrameGraph->idToKeyFrame.insert( std::make_pair( currentKeyFrame->id(),
                                                             currentKeyFrame         ) );
-        // Разблокировать поток
+        // Unlock the thread
         keyFrameGraph->idToKeyFrameMutex.unlock();
     }
 
-    // Vizualization 3D
+    // Visualization of the Key Frame (Vizualization 3D)
     if( continuousPCOutput && outputWrapper != 0 )
         outputWrapper->publishKeyframe( currentKeyFrame.get() );
 
     if (displayDepthMap || depthMapScreenshotFlag)
         debugDisplayDepthMap();
 
+    // For debuging without mapping thread loop
+    // doMappingIteration();
+
+    // Ouput of the debugging information
     printf("Done Random initialization!\n");
 }
 
+// Processing of all "not first" frames
 void SlamSystem::trackFrame(    uchar*          image               ,
                                 unsigned int    frameID             ,
                                 bool            blockUntilMapped    ,
                                 double          timestamp               )
 {
-    // Create new frame
+    // Create new frame (copying an input image)
     std::shared_ptr<Frame> trackingNewFrame(    new Frame(  frameID     ,
                                                             width       ,
                                                             height      ,
@@ -1079,35 +1105,39 @@ void SlamSystem::trackFrame(    uchar*          image               ,
                                                             timestamp   ,
                                                             image           )   );
 
-    // Если трекинг не в порядке ????
+    // If tracking isn't OK ???
+    // "When we have the failure of synchronisation"
     if( !trackingIsGood )
     {
-        // Обновить текущий фрейм
+        // Refresh the current frame
         relocalizer.updateCurrentFrame( trackingNewFrame );
 
-        // Заблокировать поток (какой???? )
+        // Lock the thread (which???? )
         unmappedTrackedFramesMutex.lock();
-        // Сообщить одному из ожидающих (о чем ??? ) mappingThreadLoop
+        // Notify to waiting one (about what ??? ) mappingThreadLoop
         unmappedTrackedFramesSignal.notify_one();
-        // Отпустить поток
+        // Unlock the thread
         unmappedTrackedFramesMutex.unlock();
 
-        // Прервать выполнение
+        // Stop perfomance
         return;
     }
 
-    // Защитить секцию ( currentKeyFrame )
+    // Protect the section ( currentKeyFrame )
+    // Beginning of frame processing
     currentKeyFrameMutex.lock();
 
-    // Сохраняется состояние перед началом работы ( где инициализация ??? )
+    // The condition is saved before work is started
+    // createNewKeyFrame is changed in this function
     bool my_createNewKeyframe = createNewKeyFrame;
 
-    // Разобраться, что это за проверки!!!!
-    // ( состояние trackingReference зависит от другого потока)
+    // Find out what we check here !!!
+    // ( The condition of trackingReference depends on other thread)
     if (    trackingReference->keyframe != currentKeyFrame.get()    ||
             currentKeyFrame->depthHasBeenUpdatedFlag    )
     {
-        // Вносятся соответствующие изменения (update dato on trackingReference)
+        // Make appropriate changes (update data in trackingReference)
+        // If tracking reference doesn't match to the current frame or depth map is updated
         trackingReference->importFrame( currentKeyFrame.get() );
         // Clear flag
         currentKeyFrame->depthHasBeenUpdatedFlag = false;
@@ -1115,46 +1145,47 @@ void SlamSystem::trackFrame(    uchar*          image               ,
         trackingReferenceFrameSharedPT = currentKeyFrame;
     }
 
-    // Получить указатель на...
+    // Make a reference to ... (check the usage)
     FramePoseStruct* trackingReferencePose = trackingReference->keyframe->pose;
 
-    // Разблокировать
+    // Unlock
     currentKeyFrameMutex.unlock();
 
     // DO TRACKING & Show tracking result.
     if( enablePrintDebugInfo && printThreadingInfo )
-        // Отобразить информацию
+        // Show the information
         printf( "TRACKING %d on %d\n", trackingNewFrame->id(), trackingReferencePose->frameID );
 
-    // Заблокировать доступ к данным
+    // Lock an access to the data
     poseConsistencyMutex.lock_shared();
 
-    // Выяснить, что это такое ????
+    // Find out what is it ???
     SE3 frameToReference_initialEstimate = se3FromSim3(
             trackingReferencePose->getCamToWorld().inverse() * keyFrameGraph->allFramePoses.back()->getCamToWorld());
 
-    // Разблокировать доступ
+    // Unlock the access
     poseConsistencyMutex.unlock_shared();
 
-    // Наверное для замера времени на расчет
+    // Probably for counting time for calculation
     struct timeval tv_start;
     struct timeval tv_end;
 
-    // Сохранить время начала
+    // Store the time of the beginning
     gettimeofday( &tv_start, NULL );
 
     SE3 newRefToFrame_poseUpdate = tracker->trackFrame( trackingReference       ,
                                                         trackingNewFrame.get()  ,
                                                         frameToReference_initialEstimate    );
 
-    // Сохранить время оконачания расчета
+    // Store the time of finishing the calculation
     gettimeofday( &tv_end, NULL );
 
-    // Расчитать время на выполнение функции
+    // Count the time for function's execution
     msTrackFrame = 0.9 * msTrackFrame + 0.1 * ( (tv_end.tv_sec - tv_start.tv_sec) * 1000.0f + ( tv_end.tv_usec - tv_start.tv_usec )/ 1000.0f );
     // Frame counter incriment
     nTrackFrame++;
 
+    // Statistics data
     tracking_lastResidual       = tracker->lastResidual;
     tracking_lastUsage          = tracker->pointUsage;
     tracking_lastGoodPerBad     = tracker->lastGoodCount / ( tracker->lastGoodCount + tracker->lastBadCount );
@@ -1179,10 +1210,12 @@ void SlamSystem::trackFrame(    uchar*          image               ,
         unmappedTrackedFramesSignal.notify_one();
         unmappedTrackedFramesMutex.unlock();
 
+        // Flag of manual reset of failure
         manualTrackingLossIndicated = false;
         return;
     }
 
+    // If drawing of tracking is ON
     if(plotTracking)
     {
         Eigen::Matrix<float, 20, 1> data;
@@ -1195,6 +1228,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
         data[6] = tracker->affineEstimation_a;
         data[7] = tracker->affineEstimation_b;
+        // Publish data
         outputWrapper->publishDebugInfo(data);
     }
 
@@ -1251,6 +1285,8 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
     unmappedTrackedFramesMutex.lock();
 
+    // Count how many frames are added to the current Key Frame (numMappedOnThisTotal)
+    // Conditions for adding of the current frame
     if(         unmappedTrackedFrames.size() < 50   ||
             (   unmappedTrackedFrames.size() < 100  &&
                 trackingNewFrame->getTrackingParent()->numMappedOnThisTotal < 10    )   )
@@ -1262,14 +1298,15 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     unmappedTrackedFramesSignal.notify_one();
     unmappedTrackedFramesMutex.unlock();
 
-    // For debugin without mapping thread
+    // For debugging without mapping thread
     doMappingIteration();
 
-    // implement blocking
+    // Implement blocking
     if( blockUntilMapped && trackingIsGood )
     {
         boost::unique_lock<boost::mutex> lock( newFrameMappedMutex );
 
+        // While buffer is not empty
         while( unmappedTrackedFrames.size() > 0 )
         {
             //printf("TRACKING IS BLOCKING, waiting for %d frames to finish mapping.\n", (int)unmappedTrackedFrames.size());
@@ -1477,7 +1514,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
 //	newKeyFrame->lastConstraintTrackedCamToWorld = newKeyFrame->getScaledCamToWorld();
 
-//	// =============== get all potential candidates and their initial relative pose. =================
+//	// =============== Get all potential candidates and their initial relative pose. =================
 //    std::vector<KFConstraintStruct*, Eigen::aligned_allocator<KFConstraintStruct*> > constraints;
 //    Frame* fabMapResult = 0;
 //    std::unordered_set<Frame*, std::hash<Frame*>, std::equal_to<Frame*>,
@@ -1512,7 +1549,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
 //	poseConsistencyMutex.unlock_shared();
 
-//	// =============== distinguish between close and "far" candidates in Graph =================
+//	// =============== Distinguish between close and "far" candidates in Graph =================
 //	// Do a first check on trackability of close candidates.
 //	std::unordered_set<Frame*, std::hash<Frame*>, std::equal_to<Frame*>,
 //		Eigen::aligned_allocator< Frame* > > closeCandidates;
@@ -1580,7 +1617,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 //    int closeAll    = closeCandidates.size();
 //    int farAll      = farCandidates.size();
 
-//	// erase the ones that we tried already before (close)
+//	// Erase the ones that we tried already before (close)
 //    for(std::unordered_set<Frame*>::iterator c = closeCandidates.begin(); c != closeCandidates.end();)
 //    {
 //        if(newKeyFrame->trackingFailed.find(*c) == newKeyFrame->trackingFailed.end())
@@ -1649,7 +1686,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
 
 
-//     //=============== limit number of close candidates ===============
+//     //=============== Limit number of close candidates ===============
 //     // while too many, remove the one with the highest connectivity.
 //    while((int)closeCandidates.size() > maxLoopClosureCandidates)
 //    {
@@ -1672,7 +1709,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 //        closeCandidates.erase(worst);
 //    }
 
-//     //=============== limit number of far candidates ===============
+//     //=============== Limit number of far candidates ===============
 //     // delete randomly
 //    int maxNumFarCandidates = (maxLoopClosureCandidates +1) / 2;
 //    if(maxNumFarCandidates < 5) maxNumFarCandidates = 5;
@@ -1689,7 +1726,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
 //   //=============== TRACK! ===============
 
-//    // make tracking reference for newKeyFrame.
+//    // Make tracking reference for newKeyFrame.
 //    newKFTrackingReference->importFrame(newKeyFrame);
 
 //    for (Frame* candidate : closeCandidates)
