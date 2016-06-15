@@ -29,7 +29,7 @@
 
 //#include "IOWrapper/OpenCV/slamimagedisplay.h"
 
-#include "src/SlamSystem.h"
+#include "SlamSystem.h"
 
 namespace lsd_slam
 {

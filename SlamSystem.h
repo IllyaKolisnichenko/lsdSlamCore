@@ -34,7 +34,7 @@
 
 #include "opencv2/core/core.hpp"
 
-#include "Tracking/Relocalizer.h"
+#include "Relocalizer.h"
 
 //#include "IOWrapper/Timestamp.h"
 

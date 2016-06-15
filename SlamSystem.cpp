@@ -25,16 +25,16 @@
 
 #include "DepthEstimation/DepthMap.h"
 
-#include "Tracking/Sim3Tracker.h"
-#include "Tracking/SE3Tracker.h"
-#include "Tracking/TrackingReference.h"
+#include "Sim3Tracker.h"
+#include "SE3Tracker.h"
+#include "TrackingReference.h"
 
 #include "globalFuncs.h"
 
-#include "GlobalMapping/KeyFrameGraph.h"
+#include "KeyFrameGraph.h"
 
-#include "GlobalMapping/TrackableKeyFrameSearch.h"
-//#include "GlobalMapping/g2oTypeSim3Sophus.h"
+#include "TrackableKeyFrameSearch.h"
+//#include "g2oTypeSim3Sophus.h"
 
 #include "ImageDisplay.h"
 #include "Output3DWrapper/myoutput3dwrapper.h"

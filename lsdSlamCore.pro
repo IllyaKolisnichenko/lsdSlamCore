@@ -18,12 +18,12 @@ DEFINES     += LSDSLAMCORE_LIBRARY
 #QMAKE_LFLAGS_DEBUG    += -pg
 
 SOURCES +=  \
-            src/LiveSLAMWrapper.cpp \
-            src/SlamSystem.cpp
+            LiveSLAMWrapper.cpp \
+            SlamSystem.cpp
 
 HEADERS +=  \
-            src/LiveSLAMWrapper.h   \
-            src/SlamSystem.h
+            LiveSLAMWrapper.h   \
+            SlamSystem.h
 
 unix {
 
