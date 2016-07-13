@@ -339,8 +339,10 @@ private:
 
 
     //*********************************************
-public:
-    void publishKeyframeGraph();
+public:    
+    void publishKeyframe        ( Frame *pKeyframe      );
+    void publishTrackedFrame    ( Frame *pTrackedFrame  );
+    void publishKeyframeGraph   ( );
 
     float   msTrackFrame;
     float   msFindReferences;

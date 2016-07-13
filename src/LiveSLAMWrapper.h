@@ -42,7 +42,6 @@ namespace lsd_slam
 
 
 class SlamSystem;
-//class LiveSLAMWrapperROS;
 class Output3DWrapper;
 
 class InputImageStream;
@@ -50,10 +49,8 @@ class InputImageStream;
 class Timestamp;
 
 /** Wrapper for SlamSystem */
-class LiveSLAMWrapper //: public Notifiable
+class LiveSLAMWrapper
 {
-
-//friend class LiveSLAMWrapperROS;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -70,7 +67,6 @@ public:
 
 	/** Destructor. */
 	~LiveSLAMWrapper();
-	
 	
     /**
      * @brief Loop
@@ -137,7 +133,7 @@ private:
     int     imageSeqNumber;
 
     // Классификаторы для обнраужения объекта
-    cv::CascadeClassifier   m_pCVFaceCascade;
+//    cv::CascadeClassifier   m_pCVFaceCascade;
 };
 
 }

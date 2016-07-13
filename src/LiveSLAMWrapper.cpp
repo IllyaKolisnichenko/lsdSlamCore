@@ -40,12 +40,12 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     // Module is not initialized yet
     isInitialized = false;
 
-    m_pCVFaceCascade.load( FACE_CASCADE_NAME);
+//    m_pCVFaceCascade.load( FACE_CASCADE_NAME);
     /// It's in utils now
     // m_poImageDisplay = new SLAMImageDisplay();
 
     // Initialize the pointers
-    m_poImageStream  = new SLAMVideoReader( 8, videoFilePath  );
+    m_poImageStream  = (InputImageStream*) new SLAMVideoReader( 8, videoFilePath  );
 
     // Read the calibration file
     m_poImageStream->setCalibration( unditorFilePath );
@@ -63,7 +63,7 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     // Null the pointers
     outFile = nullptr;
 
-    // Make a file name for the file that stores restored positions 
+    // Make a file name for the file that stores restored positions
     // outFileName = packagePath+"estimated_poses.txt";
     outFileName = "estimated_poses.txt";
 
@@ -71,18 +71,17 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     Sophus::Matrix3f K_sophus;
     K_sophus << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
+    // Null the counter
+    imageSeqNumber = 0;
+
     // Make Odometry
     // Create an instance of SlamSystem
     m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
 
     // ROSOutput3DWrapper
-    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
-                                                   m_poImageStream->height()   );
-    //  ???
-    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
-
-    // Null the counter
-    imageSeqNumber = 0;
+//    m_poOutputWrapper = (Output3DWrapper*) new MyOutput3DWrapper(   m_poImageStream->width(),
+//                                                                    m_poImageStream->height()   );
+//    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
 
     // Start to recieve Image
     m_poImageStream->run();
@@ -109,19 +108,19 @@ void LiveSLAMWrapper::Loop()
     while( true )
     {
 
-        // Get the instance of an image from the buffer 
+        // Get the instance of an image from the buffer
         TimestampedMat image = m_poImageStream->next();
 
         if(image.data.empty())
             break;
 		
         /// We need a method for asynchronous reset, stop and pause
-//        // If we need to reset the system (global variable) 
+//        // If we need to reset the system (global variable)
 //        if( fullResetRequested )
 //        {
-//            // Reset everything 
+//            // Reset everything
 //            resetAll();
-//            // Reset the flag of request 
+//            // Reset the flag of request
 //            fullResetRequested = false;
 
 //            // If the buffer is empty
@@ -140,7 +139,7 @@ void LiveSLAMWrapper::Loop()
         newImageCallback( image.data, image.timestamp );
 
         //m_poImageDisplay->waitKey( 500 );
-        //cv::waitKey( 20 );
+        cv::waitKey( 100 );
 	}
 }
 
@@ -240,54 +239,54 @@ void LiveSLAMWrapper::resetAll()
 
 void LiveSLAMWrapper::detectAndDraw(cv::Mat &image )
 {
-    // Список прямоугольников для лиц
-    std::vector < cv::Rect >   faces;
-    // Временный фрейм
-    cv::Mat             frame_gray;
+//    // Список прямоугольников для лиц
+//    std::vector < cv::Rect >   faces;
+//    // Временный фрейм
+//    cv::Mat             frame_gray;
 
-    // Преобразовать цвета
-    //cv::cvtColor( image, frame_gray, CV_RGB2GRAY  );
+//    // Преобразовать цвета
+//    //cv::cvtColor( image, frame_gray, CV_RGB2GRAY  );
 
-    frame_gray = image.clone();
+//    frame_gray = image.clone();
 
-    // Выровнять гистограмму
-    cv::equalizeHist( frame_gray, frame_gray );
+//    // Выровнять гистограмму
+//    cv::equalizeHist( frame_gray, frame_gray );
 
-    // Определить список лиц
-    m_pCVFaceCascade.detectMultiScale(  frame_gray              ,
-                                        faces                   ,
-                                        1.1                     ,
-                                        2                       ,
-                                        0|CV_HAAR_SCALE_IMAGE   ,
-                                        cv::Size(100, 100)      );
+//    // Определить список лиц
+//    m_pCVFaceCascade.detectMultiScale(  frame_gray              ,
+//                                        faces                   ,
+//                                        1.1                     ,
+//                                        2                       ,
+//                                        0|CV_HAAR_SCALE_IMAGE   ,
+//                                        cv::Size(100, 100)      );
 
-    // qDebug() << "Faces number: " << faces.size();
+//    // qDebug() << "Faces number: " << faces.size();
 
-    if( faces.size() != 0)
-    {
-        //m_oTempImage = m_oCVMat.clone();
-        cv::Mat m_oTempImage = frame_gray.clone();
+//    if( faces.size() != 0)
+//    {
+//        //m_oTempImage = m_oCVMat.clone();
+//        cv::Mat m_oTempImage = frame_gray.clone();
 
-//        cv::imshow("Grayscale Image", frame_gray);
-        frame_gray.setTo(cv::Scalar(0, 0, 0));
+////        cv::imshow("Grayscale Image", frame_gray);
+//        frame_gray.setTo(cv::Scalar(0, 0, 0));
 
-        m_oTempImage = m_oTempImage(faces[0]);
+//        m_oTempImage = m_oTempImage(faces[0]);
 
-//        cv::imshow("Before equalize Image", m_oTempImage);
-        // Выровнять гистограмму
-        cv::equalizeHist( m_oTempImage, m_oTempImage );
+////        cv::imshow("Before equalize Image", m_oTempImage);
+//        // Выровнять гистограмму
+//        cv::equalizeHist( m_oTempImage, m_oTempImage );
 
-//        cv::imshow("After equalize Image", m_oTempImage);
+////        cv::imshow("After equalize Image", m_oTempImage);
 
-        // Преобразовать цвета
-        //cv::cvtColor( m_oTempImage, TempImage_gray, CV_RGB2GRAY  );
+//        // Преобразовать цвета
+//        //cv::cvtColor( m_oTempImage, TempImage_gray, CV_RGB2GRAY  );
 
-        m_oTempImage.copyTo( frame_gray(faces[0]) );
+//        m_oTempImage.copyTo( frame_gray(faces[0]) );
 
-//        cv::imshow("Result Image", frame_gray);
-    }
+////        cv::imshow("Result Image", frame_gray);
+//    }
 
-    image = frame_gray.clone();
+//    image = frame_gray.clone();
 }
 
 }
