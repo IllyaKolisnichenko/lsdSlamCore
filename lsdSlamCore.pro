@@ -5,6 +5,7 @@
 #-------------------------------------------------
 
 QT          -= core gui
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG      += c++11
 
@@ -33,8 +34,8 @@ unix {
     BASE_LIBS_PATH = $$PWD/../build
 
     INCLUDEPATH +=  ../lsdSlamUtil/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamUtil          \
-                    -llsdSlamUtil
+#    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamUtil          \
+#                    -llsdSlamUtil
 
     INCLUDEPATH +=  ../lsdSlamIO/
     LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamIO            \
@@ -53,23 +54,26 @@ unix {
                     -llsdSlamTracking
 
     INCLUDEPATH +=  ../lsdSlam3DOutput/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlam3DOutput      \
-                    -llsdSlam3DOutput
+#    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlam3DOutput      \
+#                    -llsdSlam3DOutput
 
     # OpenCV
-    OPENCV_INCLUDE_PATH        = /home/sergey/libs/opencv-3.0.0/include
-    OPENCV_INCLUDE_MODULE_PATH = /home/sergey/libs/opencv-3.0.0/release/modules
+#    OPENCV_INCLUDE_PATH        = /home/sergey/libs/opencv-3.0.0/include
+#    OPENCV_INCLUDE_MODULE_PATH = /home/sergey/libs/opencv-3.0.0/release/modules
 
-    OPENCV_LIBS_PATH           = /home/sergey/libs/opencv-3.0.0/release/lib
+#    OPENCV_LIBS_PATH           = /home/sergey/libs/opencv-3.0.0/release/lib
 
-        message( " Unix - Version OpenCV - 3.00 - Release " )
-        message( $$OPENCV_LIBS_PATH )
+#        message( " Unix - Version OpenCV - 3.00 - Release " )
+#        message( $$OPENCV_LIBS_PATH )
 
-        LIBS    += -L$$OPENCV_LIBS_PATH
-        LIBS    += -lopencv_objdetect   -lopencv_imgproc
-        LIBS    += -lopencv_videoio     -lopencv_core
-        LIBS    += -lopencv_imgcodecs   -lopencv_highgui
+##    LIBS    += -L$$OPENCV_LIBS_PATH
+    LIBS    += -L/usr/local/lib
 
+    LIBS    += -lopencv_objdetect   -lopencv_imgproc
+    LIBS    += -lopencv_videoio     -lopencv_core
+    LIBS    += -lopencv_highgui
+#    LIBS    += -lopencv_features2d  -lopencv_calib3d
+#    LIBS    += -lopencv_imgcodecs
     # Boost
     LIBS    +=  -lboost_thread -lboost_system
 

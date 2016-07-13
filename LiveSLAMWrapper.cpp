@@ -18,6 +18,8 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <QDebug>
+
 #include "LiveSLAMWrapper.h"
 
 #include "IOWrapper/TimestampedObject.h"
@@ -25,7 +27,7 @@
 //#include "IOWrapper/InputImageStream.h"
 #include "IOWrapper/VideoReader/slamvideoreader.h"
 
-#include "Output3DWrapper/myoutput3dwrapper.h"
+//#include "Output3DWrapper/myoutput3dwrapper.h"
 
 //#include "IOWrapper/OpenCV/slamimagedisplay.h"
 
@@ -35,57 +37,64 @@ namespace lsd_slam
 {
 
 LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorFilePath) :
-    m_bDoSlam   (false)
+    m_bDoSlam       ( false     ),
+    m_poImageStream ( nullptr   ),
+    outFile         ( nullptr   )
 {
     // Module is not initialized yet
     isInitialized = false;
 
-    m_pCVFaceCascade.load( FACE_CASCADE_NAME);
+    // Null the pointers
+    outFile = nullptr;
+    // Make a file name for the file that stores restored positions
+    // outFileName = packagePath+"estimated_poses.txt";
+    outFileName = "estimated_poses.txt";
+
+//    m_pCVFaceCascade.load( FACE_CASCADE_NAME);
     /// It's in utils now
     // m_poImageDisplay = new SLAMImageDisplay();
 
     // Initialize the pointers
     m_poImageStream  = new SLAMVideoReader( 8, videoFilePath  );
 
-    // Read the calibration file
-    m_poImageStream->setCalibration( unditorFilePath );
+    if( m_poImageStream != nullptr )
+    {
+        // Read the calibration file
+        m_poImageStream->setCalibration( unditorFilePath );
 
-    // Set the parameters of the camera
-    fx = m_poImageStream->fx();
-    fy = m_poImageStream->fy();
-    cx = m_poImageStream->cx();
-    cy = m_poImageStream->cy();
+        // Set the parameters of the camera
+        fx = m_poImageStream->fx();
+        fy = m_poImageStream->fy();
+        cx = m_poImageStream->cx();
+        cy = m_poImageStream->cy();
 
-    // Set the size of the image
-    width   = m_poImageStream->width();
-    height  = m_poImageStream->height();
+        // Set the size of the image
+        width   = m_poImageStream->width();
+        height  = m_poImageStream->height();
 
-    // Null the pointers
-    outFile = nullptr;
+        // Initialize the matrix of the camera
+        Sophus::Matrix3f K_sophus;
+        K_sophus << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
-    // Make a file name for the file that stores restored positions 
-    // outFileName = packagePath+"estimated_poses.txt";
-    outFileName = "estimated_poses.txt";
+        // Make Odometry
+        // Create an instance of SlamSystem
+        m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
 
-    // Initialize the matrix of the camera
-    Sophus::Matrix3f K_sophus;
-    K_sophus << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
+        // ROSOutput3DWrapper
+    //    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
+    //                                                   m_poImageStream->height()   );
+    //    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
 
-    // Make Odometry
-    // Create an instance of SlamSystem
-    m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
+        // Null the counter
+        imageSeqNumber = 0;
 
-    // ROSOutput3DWrapper
-    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
-                                                   m_poImageStream->height()   );
-    //  ???
-    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
-
-    // Null the counter
-    imageSeqNumber = 0;
-
-    // Start to recieve Image
-    m_poImageStream->run();
+        // Start to recieve Image
+        m_poImageStream->run();
+    }
+    else
+    {
+        qDebug() << " Video Reader did not initialaized !!";
+    }
 }
 
 LiveSLAMWrapper::~LiveSLAMWrapper()
@@ -229,7 +238,7 @@ void LiveSLAMWrapper::resetAll()
 
         m_poMonoOdometry = new SlamSystem(width,height, K, m_bDoSlam);
 
-        m_poMonoOdometry->setVisualization(m_poOutputWrapper);
+//        m_poMonoOdometry->setVisualization(m_poOutputWrapper);
 
     }
     imageSeqNumber  = 0;
@@ -240,6 +249,7 @@ void LiveSLAMWrapper::resetAll()
 
 void LiveSLAMWrapper::detectAndDraw(cv::Mat &image )
 {
+    /*
     // Список прямоугольников для лиц
     std::vector < cv::Rect >   faces;
     // Временный фрейм
@@ -288,6 +298,7 @@ void LiveSLAMWrapper::detectAndDraw(cv::Mat &image )
     }
 
     image = frame_gray.clone();
+    */
 }
 
 }

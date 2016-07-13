@@ -42,8 +42,9 @@ namespace lsd_slam
 
 
 class SlamSystem;
+
 //class LiveSLAMWrapperROS;
-class Output3DWrapper;
+//class Output3DWrapper;
 
 class InputImageStream;
 //class SLAMImageDisplay;
@@ -115,7 +116,7 @@ private:
     InputImageStream*   m_poImageStream;
 
     /// Pointer to the object of output thread
-    Output3DWrapper*    m_poOutputWrapper;
+//    Output3DWrapper*    m_poOutputWrapper;
 
     // Object for Image Dispaly
  //   SLAMImageDisplay*   m_poImageDisplay;
@@ -137,7 +138,7 @@ private:
     int     imageSeqNumber;
 
     // Классификаторы для обнраужения объекта
-    cv::CascadeClassifier   m_pCVFaceCascade;
+//    cv::CascadeClassifier   m_pCVFaceCascade;
 };
 
 }

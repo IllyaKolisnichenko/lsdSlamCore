@@ -574,7 +574,10 @@ void SlamSystem::createNewCurrentKeyframe(std::shared_ptr<Frame> newKeyframeCand
         data[1] = (runningStats.num_prop_created + runningStats.num_prop_merged) / (float)runningStats.num_prop_attempts;
         data[2] = runningStats.num_prop_removed_colorDiff / (float)runningStats.num_prop_attempts;
 
-        outputWrapper->publishDebugInfo(data);
+        if (outputWrapper != 0)
+        {
+            outputWrapper->publishDebugInfo(data);
+        }
     }
 
     currentKeyFrameMutex.lock();
@@ -728,7 +731,10 @@ bool SlamSystem::updateKeyframe()
         data[13] = runningStats.num_observe_skip_oob;
         data[14] = runningStats.num_observe_skip_fail;
 
-        outputWrapper->publishDebugInfo(data);
+        if (outputWrapper != 0)
+        {
+            outputWrapper->publishDebugInfo(data);
+        }
     }
 
     // If everything is OK
@@ -1228,8 +1234,12 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
         data[6] = tracker->affineEstimation_a;
         data[7] = tracker->affineEstimation_b;
-        // Publish data
-        outputWrapper->publishDebugInfo(data);
+
+        if (outputWrapper != 0)
+        {
+            // Publish data
+            outputWrapper->publishDebugInfo(data);
+        }
     }
 
     // Append KF to KF graph
