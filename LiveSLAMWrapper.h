@@ -42,6 +42,8 @@ namespace lsd_slam
 
 
 class SlamSystem;
+
+//class LiveSLAMWrapperROS;
 class Output3DWrapper;
 
 class InputImageStream;
@@ -67,6 +69,7 @@ public:
 
 	/** Destructor. */
 	~LiveSLAMWrapper();
+	
 	
     /**
      * @brief Loop

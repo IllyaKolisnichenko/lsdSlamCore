@@ -18,6 +18,8 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <QDebug>
+
 #include "LiveSLAMWrapper.h"
 
 #include "IOWrapper/TimestampedObject.h"
@@ -25,11 +27,11 @@
 //#include "IOWrapper/InputImageStream.h"
 #include "IOWrapper/VideoReader/slamvideoreader.h"
 
-#include "Output3DWrapper/myoutput3dwrapper.h"
+//#include "Output3DWrapper/myoutput3dwrapper.h"
 
 //#include "IOWrapper/OpenCV/slamimagedisplay.h"
 
-#include "src/SlamSystem.h"
+#include "SlamSystem.h"
 
 namespace lsd_slam
 {
@@ -47,44 +49,44 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     // Initialize the pointers
     m_poImageStream  = (InputImageStream*) new SLAMVideoReader( 8, videoFilePath  );
 
-    // Read the calibration file
-    m_poImageStream->setCalibration( unditorFilePath );
+    if( m_poImageStream != nullptr )
+    {
+        // Read the calibration file
+        m_poImageStream->setCalibration( unditorFilePath );
 
-    // Set the parameters of the camera
-    fx = m_poImageStream->fx();
-    fy = m_poImageStream->fy();
-    cx = m_poImageStream->cx();
-    cy = m_poImageStream->cy();
+        // Set the parameters of the camera
+        fx = m_poImageStream->fx();
+        fy = m_poImageStream->fy();
+        cx = m_poImageStream->cx();
+        cy = m_poImageStream->cy();
 
-    // Set the size of the image
-    width   = m_poImageStream->width();
-    height  = m_poImageStream->height();
+        // Set the size of the image
+        width   = m_poImageStream->width();
+        height  = m_poImageStream->height();
 
-    // Null the pointers
-    outFile = nullptr;
+        // Initialize the matrix of the camera
+        Sophus::Matrix3f K_sophus;
+        K_sophus << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
-    // Make a file name for the file that stores restored positions
-    // outFileName = packagePath+"estimated_poses.txt";
-    outFileName = "estimated_poses.txt";
+        // Make Odometry
+        // Create an instance of SlamSystem
+        m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
 
-    // Initialize the matrix of the camera
-    Sophus::Matrix3f K_sophus;
-    K_sophus << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
+        // ROSOutput3DWrapper
+    //    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
+    //                                                   m_poImageStream->height()   );
+    //    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
 
-    // Null the counter
-    imageSeqNumber = 0;
+        // Null the counter
+        imageSeqNumber = 0;
 
-    // Make Odometry
-    // Create an instance of SlamSystem
-    m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
-
-    // ROSOutput3DWrapper
-//    m_poOutputWrapper = (Output3DWrapper*) new MyOutput3DWrapper(   m_poImageStream->width(),
-//                                                                    m_poImageStream->height()   );
-//    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
-
-    // Start to recieve Image
-    m_poImageStream->run();
+        // Start to recieve Image
+        m_poImageStream->run();
+    }
+    else
+    {
+        qDebug() << " Video Reader did not initialaized !!";
+    }
 }
 
 LiveSLAMWrapper::~LiveSLAMWrapper()
@@ -228,7 +230,7 @@ void LiveSLAMWrapper::resetAll()
 
         m_poMonoOdometry = new SlamSystem(width,height, K, m_bDoSlam);
 
-        m_poMonoOdometry->setVisualization(m_poOutputWrapper);
+//        m_poMonoOdometry->setVisualization(m_poOutputWrapper);
 
     }
     imageSeqNumber  = 0;
@@ -239,54 +241,56 @@ void LiveSLAMWrapper::resetAll()
 
 void LiveSLAMWrapper::detectAndDraw(cv::Mat &image )
 {
-//    // Список прямоугольников для лиц
-//    std::vector < cv::Rect >   faces;
-//    // Временный фрейм
-//    cv::Mat             frame_gray;
+    /*
+    // Список прямоугольников для лиц
+    std::vector < cv::Rect >   faces;
+    // Временный фрейм
+    cv::Mat             frame_gray;
 
-//    // Преобразовать цвета
-//    //cv::cvtColor( image, frame_gray, CV_RGB2GRAY  );
+    // Преобразовать цвета
+    //cv::cvtColor( image, frame_gray, CV_RGB2GRAY  );
 
-//    frame_gray = image.clone();
+    frame_gray = image.clone();
 
-//    // Выровнять гистограмму
-//    cv::equalizeHist( frame_gray, frame_gray );
+    // Выровнять гистограмму
+    cv::equalizeHist( frame_gray, frame_gray );
 
-//    // Определить список лиц
-//    m_pCVFaceCascade.detectMultiScale(  frame_gray              ,
-//                                        faces                   ,
-//                                        1.1                     ,
-//                                        2                       ,
-//                                        0|CV_HAAR_SCALE_IMAGE   ,
-//                                        cv::Size(100, 100)      );
+    // Определить список лиц
+    m_pCVFaceCascade.detectMultiScale(  frame_gray              ,
+                                        faces                   ,
+                                        1.1                     ,
+                                        2                       ,
+                                        0|CV_HAAR_SCALE_IMAGE   ,
+                                        cv::Size(100, 100)      );
 
-//    // qDebug() << "Faces number: " << faces.size();
+    // qDebug() << "Faces number: " << faces.size();
 
-//    if( faces.size() != 0)
-//    {
-//        //m_oTempImage = m_oCVMat.clone();
-//        cv::Mat m_oTempImage = frame_gray.clone();
+    if( faces.size() != 0)
+    {
+        //m_oTempImage = m_oCVMat.clone();
+        cv::Mat m_oTempImage = frame_gray.clone();
 
-////        cv::imshow("Grayscale Image", frame_gray);
-//        frame_gray.setTo(cv::Scalar(0, 0, 0));
+//        cv::imshow("Grayscale Image", frame_gray);
+        frame_gray.setTo(cv::Scalar(0, 0, 0));
 
-//        m_oTempImage = m_oTempImage(faces[0]);
+        m_oTempImage = m_oTempImage(faces[0]);
 
-////        cv::imshow("Before equalize Image", m_oTempImage);
-//        // Выровнять гистограмму
-//        cv::equalizeHist( m_oTempImage, m_oTempImage );
+//        cv::imshow("Before equalize Image", m_oTempImage);
+        // Выровнять гистограмму
+        cv::equalizeHist( m_oTempImage, m_oTempImage );
 
-////        cv::imshow("After equalize Image", m_oTempImage);
+//        cv::imshow("After equalize Image", m_oTempImage);
 
-//        // Преобразовать цвета
-//        //cv::cvtColor( m_oTempImage, TempImage_gray, CV_RGB2GRAY  );
+        // Преобразовать цвета
+        //cv::cvtColor( m_oTempImage, TempImage_gray, CV_RGB2GRAY  );
 
-//        m_oTempImage.copyTo( frame_gray(faces[0]) );
+        m_oTempImage.copyTo( frame_gray(faces[0]) );
 
-////        cv::imshow("Result Image", frame_gray);
-//    }
+//        cv::imshow("Result Image", frame_gray);
+    }
 
-//    image = frame_gray.clone();
+    image = frame_gray.clone();
+    */
 }
 
 }

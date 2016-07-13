@@ -25,16 +25,16 @@
 
 #include "DepthEstimation/DepthMap.h"
 
-#include "Tracking/Sim3Tracker.h"
-#include "Tracking/SE3Tracker.h"
-#include "Tracking/TrackingReference.h"
+#include "Sim3Tracker.h"
+#include "SE3Tracker.h"
+#include "TrackingReference.h"
 
 #include "globalFuncs.h"
 
-#include "GlobalMapping/KeyFrameGraph.h"
+#include "KeyFrameGraph.h"
 
-#include "GlobalMapping/TrackableKeyFrameSearch.h"
-//#include "GlobalMapping/g2oTypeSim3Sophus.h"
+#include "TrackableKeyFrameSearch.h"
+//#include "g2oTypeSim3Sophus.h"
 
 #include "ImageDisplay.h"
 #include "Output3DWrapper/myoutput3dwrapper.h"
@@ -135,7 +135,7 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
         candidateTrackingReference	= 0;
     }
 
-    outputWrapper = nullptr;
+    outputWrapper = 0;
 
 	keepRunning 				= true;
 	doFinalOptimization 		= false;
@@ -739,8 +739,10 @@ bool SlamSystem::updateKeyframe()
         data[13] = runningStats.num_observe_skip_oob;
         data[14] = runningStats.num_observe_skip_fail;
 
-        if( outputWrapper != nullptr )
+        if (outputWrapper != 0)
+        {
             outputWrapper->publishDebugInfo(data);
+        }
     }
 
     // If everything is OK
@@ -1240,8 +1242,12 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
         data[6] = tracker->affineEstimation_a;
         data[7] = tracker->affineEstimation_b;
-        // Publish data
-        outputWrapper->publishDebugInfo(data);
+
+        if (outputWrapper != 0)
+        {
+            // Publish data
+            outputWrapper->publishDebugInfo(data);
+        }
     }
 
     // Append KF to KF graph
@@ -1249,7 +1255,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
     // Sim3 lastTrackedCamToWorld = mostCurrentTrackedFrame->getScaledCamToWorld();
     //  mostCurrentTrackedFrame->TrackingParent->getScaledCamToWorld() * sim3FromSE3(mostCurrentTrackedFrame->thisToParent_SE3TrackingResult, 1.0);
-    if (outputWrapper != nullptr)
+    if (outputWrapper != 0)
     {
 //        outputWrapper->publishTrackedFrame(trackingNewFrame.get());
         publishTrackedFrame(trackingNewFrame.get());
