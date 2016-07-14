@@ -14,9 +14,9 @@ TEMPLATE    = lib
 
 DEFINES     += LSDSLAMCORE_LIBRARY
 
-#QMAKE_CFLAGS_DEBUG    += -g -funwind-tables -fno-omit-frame-pointer -std=c++11
-#QMAKE_CXXFLAGS_DEBUG  += -g -funwind-tables -fno-omit-frame-pointer -std=c++11
-#QMAKE_LFLAGS_DEBUG    += -g -funwind-tables -fno-omit-frame-pointer -std=c++11
+QMAKE_CFLAGS_DEBUG    += -g -funwind-tables -fno-omit-frame-pointer -std=c++11
+QMAKE_CXXFLAGS_DEBUG  += -g -funwind-tables -fno-omit-frame-pointer -std=c++11
+QMAKE_LFLAGS_DEBUG    += -g -funwind-tables -fno-omit-frame-pointer -std=c++11
 
 #QMAKE_CFLAGS   += -std=c++11 -fopenmp
 #QMAKE_CXXFLAGS += -std=c++11 -fopenmp
