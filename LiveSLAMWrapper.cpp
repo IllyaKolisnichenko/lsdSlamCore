@@ -20,10 +20,14 @@
 
 #include "LiveSLAMWrapper.h"
 
-#include "IOWrapper/TimestampedObject.h"
+//#include "IOWrapper/TimestampedObject.h"
+//#include "../lsdSlamIO/include/TimestampedObject.h"
 
 //#include "IOWrapper/InputImageStream.h"
-#include "IOWrapper/VideoReader/slamvideoreader.h"
+#include "../lsdSlamIO/include/InputImageStream.h"
+//#include "IOWrapper/VideoReader/slamvideoreader.h"
+#include "../lsdSlamIO/include/sources/videoreader.h"
+#include "../lsdSlamIO/include/sources/imagereader.h"
 
 #include "Output3DWrapper/myoutput3dwrapper.h"
 
@@ -45,10 +49,13 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     // m_poImageDisplay = new SLAMImageDisplay();
 
     // Initialize the pointers
-    m_poImageStream  = new SLAMVideoReader( 8, videoFilePath  );
+//    m_poImageStream  = new VideoReader( videoFilePath  );
+    m_poImageStream  = new ImageReader( videoFilePath  );
 
     // Read the calibration file
     m_poImageStream->setCalibration( unditorFilePath );
+
+    m_poImageStream->setFrameCallback((ImageStreamCallback*)this);
 
     // Set the parameters of the camera
     fx = m_poImageStream->fx();
@@ -76,8 +83,8 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
 
     // ROSOutput3DWrapper
-    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
-                                                   m_poImageStream->height()   );
+//    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
+//                                                   m_poImageStream->height()   );
     //  ???
     m_poMonoOdometry->setVisualization( m_poOutputWrapper );
 
@@ -110,10 +117,10 @@ void LiveSLAMWrapper::Loop()
     {
 
         // Get the instance of an image from the buffer 
-        TimestampedMat image = m_poImageStream->next();
+//        cv::Mat image = m_poImageStream->nextFrame();
 
-        if(image.data.empty())
-            break;
+//        if(image.empty())
+//            break;
 		
         /// We need a method for asynchronous reset, stop and pause
 //        // If we need to reset the system (global variable) 
@@ -134,33 +141,47 @@ void LiveSLAMWrapper::Loop()
         /// //TODO:
  //       m_poImageDisplay->displayImage( "MyVideo", image.data );
         // Output the image
-        Util::displayImage( "MyVideo", image.data );
+        Util::displayImage( "MyVideo", image );
 
         // Process a new image
-        newImageCallback( image.data, image.timestamp );
+        newImageCallback( image/*, image.timestamp*/ );
 
         //m_poImageDisplay->waitKey( 500 );
         //cv::waitKey( 20 );
 	}
 }
 
-void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
+void LiveSLAMWrapper::newFrameCallback(  cv::Mat* frame )
 {
+    /// We need a method for asynchronous reset, stop and pause
+//        // If we need to reset the system (global variable)
+//        if( fullResetRequested )
+//        {
+//            // Reset everything
+//            resetAll();
+//            // Reset the flag of request
+//            fullResetRequested = false;
+
+//            // If the buffer is empty
+//            if ( !(m_poImageStream->getBuffer()->size() > 0) )
+//                // Go to the next iteration
+//                continue;
+//        }
+
     // Increment the counter 
 	++ imageSeqNumber;
 
 	// Convert image to grayscale, if necessary
-    /// **** Я ЭТО СДЕЛАЛ НА УРОВНЕ КАМЕРЫ !!!!!!!!! *********
     // Transform an image to greyscale
 	cv::Mat grayImg;
 
     // Check the amount of canals
     if ( img.channels() == 1 )
         // Just assigning 
-		grayImg = img;
+        grayImg = *frame;
 	else
         // Transforming
-        cvtColor( img, grayImg, CV_RGB2GRAY );
+        cvtColor( *frame, grayImg, CV_RGB2GRAY );
 	
 	// Assert that we work with 8 bit images
     assert( grayImg.elemSize() == 1 );
@@ -172,7 +193,7 @@ void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
     if( !isInitialized && m_poMonoOdometry != nullptr )
     {
         // Random initialization
-        m_poMonoOdometry->randomInit( grayImg.data, imgTime.toSec(), 1 );
+        m_poMonoOdometry->randomInit( grayImg.data,/* imgTime.toSec()*/ 0.0, 1 );
 
         // Make a note of the initialization 
         isInitialized = true;
@@ -183,10 +204,23 @@ void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
         m_poMonoOdometry->trackFrame(   grayImg.data    ,
                                         imageSeqNumber  ,
                                         false           ,
-                                        imgTime.toSec()     );
+                                        /*imgTime.toSec()*/   0.0 );
     }
+
+    /// !!!! Вывести изображение
+    /// //TODO:
+//       m_poImageDisplay->displayImage( "MyVideo", image.data );
+    // Output the image
+    Util::displayImage( "MyVideo", image );
+
+    // Process a new image
+    newImageCallback( image/*, image.timestamp*/ );
+
+    //m_poImageDisplay->waitKey( 500 );
+    //cv::waitKey( 20 );
 }
 
+/*
 //void LiveSLAMWrapper::logCameraPose(const SE3& camToWorld, double time)
 //{
 //    Sophus::Quaternionf quat    = camToWorld.unit_quaternion().cast<float>();
@@ -208,6 +242,7 @@ void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
 //	outFile->write(buffer,num);
 //	outFile->flush();
 //}
+*/
 
 void LiveSLAMWrapper::requestReset()
 {

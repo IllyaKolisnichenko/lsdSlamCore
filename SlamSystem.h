@@ -20,8 +20,6 @@
 
 #pragma once
 
-//#include "lsdslamcore_global.h"
-
 #include <vector>
 
 #include <boost/thread.hpp>
@@ -52,16 +50,16 @@ class   Sim3Tracker;
 
 class   DepthMap;
 class   Frame;
-class   FramePoseStruct;
+//class   FramePoseStruct;
 
 //class   DataSet;
 
-class   LiveSLAMWrapper;
-class   Output3DWrapper;
+//class   LiveSLAMWrapper;
+//class   Output3DWrapper;
 
 typedef Eigen::Matrix<float, 7, 7> Matrix7x7;
 
-class SlamSystem
+class SlamSystem : public InputImageStream
 {
 friend class IntegrationTest;
 public:

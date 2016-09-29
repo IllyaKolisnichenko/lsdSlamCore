@@ -1160,8 +1160,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     poseConsistencyMutex.lock_shared();
 
     // Find out what is it ???
-    SE3 frameToReference_initialEstimate = se3FromSim3(
-            trackingReferencePose->getCamToWorld().inverse() * keyFrameGraph->allFramePoses.back()->getCamToWorld());
+    SE3 frameToReference_initialEstimate = se3FromSim3( trackingReferencePose->getCamToWorld().inverse() * keyFrameGraph->allFramePoses.back()->getCamToWorld());
 
     // Unlock the access
     poseConsistencyMutex.unlock_shared();

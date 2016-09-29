@@ -25,32 +25,33 @@
 #include <chrono>
 #include <vector>
 
-#include "IOWrapper/NotifyBuffer.h"
 #include "ImageDisplay.h"
 
 #include "SophusUtil.h"
 
-#include "opencv2/opencv.hpp"
+#include <opencv2/opencv.hpp>
+
+#include <imagestreamcallback.h>
 
 namespace cv {
 	class Mat;
 }
 
+class InputImageStream;
+
 namespace lsd_slam
 {
+
 #define FACE_CASCADE_NAME   "/home/sergey/libs/opencv-3.0.0/data/haarcascades/haarcascade_frontalface_alt.xml"
 
-
 class SlamSystem;
-//class LiveSLAMWrapperROS;
 class Output3DWrapper;
 
-class InputImageStream;
 //class SLAMImageDisplay;
-class Timestamp;
+//class Timestamp;
 
 /** Wrapper for SlamSystem */
-class LiveSLAMWrapper //: public Notifiable
+class LiveSLAMWrapper : ImageStreamCallback
 {
 
 //friend class LiveSLAMWrapperROS;
@@ -70,8 +71,7 @@ public:
 
 	/** Destructor. */
 	~LiveSLAMWrapper();
-	
-	
+		
     /**
      * @brief Loop
      *
@@ -91,17 +91,7 @@ public:
      *
      * Resets everything, starting the odometry from the beginning again.
      */
-	void resetAll();
-
-    /**
-     * @brief newImageCallback
-     *
-     * Callback function for new RGB images.
-     *
-     * @param img
-     * @param imgTime
-     */
-	void newImageCallback(const cv::Mat& img, Timestamp imgTime);
+    void resetAll();
 
 //	/** Writes the given time and pose to the outFile. */
 //	void logCameraPose(const SE3& camToWorld, double time);
@@ -110,10 +100,21 @@ public:
 //    inline SlamSystem* getSlamSystem() {return m_poMonoOdometry;}
 
     void detectAndDraw(cv::Mat &image);
+
+protected:
+    /**
+     * @brief newFrameCallback
+     *
+     * Callback function for new RGB images.
+     *
+     * @param img
+     *
+     */
+    void  newFrameCallback( cv::Mat* frame);
+
 private:
     /// Pointer to the object of input thread
     InputImageStream*   m_poImageStream;
-
     /// Pointer to the object of output thread
     Output3DWrapper*    m_poOutputWrapper;
 
