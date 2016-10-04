@@ -20,6 +20,10 @@
 
 #pragma once
 
+//#include <QMainWindow>
+//#include <QLabel>
+//#include <QImage>
+
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -51,7 +55,7 @@ class Output3DWrapper;
 //class Timestamp;
 
 /** Wrapper for SlamSystem */
-class LiveSLAMWrapper : ImageStreamCallback
+class LiveSLAMWrapper :/* public QMainWindow, */public ImageStreamCallback
 {
 
 //friend class LiveSLAMWrapperROS;
@@ -73,11 +77,18 @@ public:
 	~LiveSLAMWrapper();
 		
     /**
-     * @brief Loop
+     * @brief run
      *
      * Runs the main processing loop. Will never return.
      */
-	void Loop();
+    void run();
+
+    /**
+     * @brief run
+     *
+     * Runs the main processing loop. Will never return.
+     */
+    void join();
 	
     /**
      * @brief requestReset
@@ -131,7 +142,7 @@ private:
 
     std::string     outFileName;
     std::ofstream*  outFile;
-	
+
     float   fx, fy, cx, cy;
     int     width, height;
 
@@ -139,6 +150,10 @@ private:
 
     // Классификаторы для обнраужения объекта
     cv::CascadeClassifier   m_pCVFaceCascade;
+
+    cv::Mat m_tempImage;
+
+//    QLabel  m_imageLabel;
 };
 
 }

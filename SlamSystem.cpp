@@ -728,7 +728,8 @@ bool SlamSystem::updateKeyframe()
         data[13] = runningStats.num_observe_skip_oob;
         data[14] = runningStats.num_observe_skip_fail;
 
-        outputWrapper->publishDebugInfo(data);
+        if( outputWrapper )
+            outputWrapper->publishDebugInfo(data);
     }
 
     // If everything is OK

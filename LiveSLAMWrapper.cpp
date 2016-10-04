@@ -85,14 +85,22 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
     // ROSOutput3DWrapper
 //    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
 //                                                   m_poImageStream->height()   );
-    //  ???
-    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
+//    //  ???
+//    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
 
     // Null the counter
     imageSeqNumber = 0;
 
-    // Start to recieve Image
-    m_poImageStream->run();
+    // Start slam
+//    this->run();
+
+    std::cout << "LiveSLAMWrapper::LiveSLAMWrapper: Constructor done..."  << std::endl;
+
+    // Wait for thread ending
+//    this->join();
+
+    // Block for time
+    boost::this_thread::sleep_for( boost::chrono::milliseconds(100 ));
 }
 
 LiveSLAMWrapper::~LiveSLAMWrapper()
@@ -107,52 +115,24 @@ LiveSLAMWrapper::~LiveSLAMWrapper()
 		outFile->flush();
 		outFile->close();
 		delete outFile;
-	}
+    }
 }
 
-void LiveSLAMWrapper::Loop()
+void LiveSLAMWrapper::run()
 {
-    // The loop of threads processing
-    while( true )
-    {
+    // Start to recieve Image
+    m_poImageStream->run();
+}
 
-        // Get the instance of an image from the buffer 
-//        cv::Mat image = m_poImageStream->nextFrame();
-
-//        if(image.empty())
-//            break;
-		
-        /// We need a method for asynchronous reset, stop and pause
-//        // If we need to reset the system (global variable) 
-//        if( fullResetRequested )
-//        {
-//            // Reset everything 
-//            resetAll();
-//            // Reset the flag of request 
-//            fullResetRequested = false;
-
-//            // If the buffer is empty
-//            if ( !(m_poImageStream->getBuffer()->size() > 0) )
-//                // Go to the next iteration
-//                continue;
-//        }
-		
-        /// !!!! Вывести изображение
-        /// //TODO:
- //       m_poImageDisplay->displayImage( "MyVideo", image.data );
-        // Output the image
-        Util::displayImage( "MyVideo", image );
-
-        // Process a new image
-        newImageCallback( image/*, image.timestamp*/ );
-
-        //m_poImageDisplay->waitKey( 500 );
-        //cv::waitKey( 20 );
-	}
+void LiveSLAMWrapper::join()
+{
+    m_poImageStream->join();
 }
 
 void LiveSLAMWrapper::newFrameCallback(  cv::Mat* frame )
 {
+    std::cout << "LiveSLAMWrapper::newFrameCallback: New Frame camming..."  << std::endl;
+
     /// We need a method for asynchronous reset, stop and pause
 //        // If we need to reset the system (global variable)
 //        if( fullResetRequested )
@@ -168,22 +148,55 @@ void LiveSLAMWrapper::newFrameCallback(  cv::Mat* frame )
 //                continue;
 //        }
 
-    // Increment the counter 
-	++ imageSeqNumber;
+    ///*************************************************************************
+    /// !!!! Вывести изображение
+    /// //TODO:
+//       m_poImageDisplay->displayImage( "MyVideo", image.data );
 
-	// Convert image to grayscale, if necessary
+        m_tempImage = frame->clone();
+
+    // Output the image
+    Util::displayImage( "MyVideo", m_tempImage );
+//    cv::imshow( "MyVideo", m_tempImage);
+
+
+//    QImage imgIn= QImage( (uchar*)  frame->data,
+//                                    frame->cols,
+//                                    frame->rows,
+//                                    frame->step,
+//                                    /*QImage::Format_Grayscale8*/
+////                                            QImage::Format_RGB32
+//                                    QImage::Format_RGB888);
+
+//    // get label dimensions
+//    int w = m_imageLabel.width();
+//    int h = m_imageLabel.height();
+
+//    // set a scaled pixmap to a w x h window keeping its aspect ratio
+//    m_imageLabel.setPixmap(QPixmap::fromImage(imgIn).scaled(w,h,Qt::KeepAspectRatio));
+
+//
+//    m_imageLabel.show();
+
+
+    ///************************************************************************
+
+    // Increment the counter
+    ++ imageSeqNumber;
+
+    // Convert image to grayscale, if necessary
     // Transform an image to greyscale
-	cv::Mat grayImg;
+    cv::Mat grayImg;
 
     // Check the amount of canals
-    if ( img.channels() == 1 )
-        // Just assigning 
+    if ( frame->channels() == 1 )
+        // Just assigning
         grayImg = *frame;
-	else
+    else
         // Transforming
         cvtColor( *frame, grayImg, CV_RGB2GRAY );
 	
-	// Assert that we work with 8 bit images
+    // Assert that we work with 8 bit images
     assert( grayImg.elemSize() == 1 );
     assert( fx != 0 || fy != 0 );
 
@@ -195,10 +208,10 @@ void LiveSLAMWrapper::newFrameCallback(  cv::Mat* frame )
         // Random initialization
         m_poMonoOdometry->randomInit( grayImg.data,/* imgTime.toSec()*/ 0.0, 1 );
 
-        // Make a note of the initialization 
+        // Make a note of the initialization
         isInitialized = true;
     }
-    // If initialization is successful and SLAM pointer exists 
+    // If initialization is successful and SLAM pointer exists
     else if( isInitialized && m_poMonoOdometry != nullptr )
     {
         m_poMonoOdometry->trackFrame(   grayImg.data    ,
@@ -207,17 +220,13 @@ void LiveSLAMWrapper::newFrameCallback(  cv::Mat* frame )
                                         /*imgTime.toSec()*/   0.0 );
     }
 
-    /// !!!! Вывести изображение
-    /// //TODO:
-//       m_poImageDisplay->displayImage( "MyVideo", image.data );
-    // Output the image
-    Util::displayImage( "MyVideo", image );
-
-    // Process a new image
-    newImageCallback( image/*, image.timestamp*/ );
-
     //m_poImageDisplay->waitKey( 500 );
-    //cv::waitKey( 20 );
+//    cv::waitKey( 50 );
+
+    // Block for time
+//    boost::this_thread::sleep_for( boost::chrono::milliseconds( 50 ));
+
+    std::cout << "LiveSLAMWrapper::newFrameCallback: New Frame functiom done..."  << std::endl;
 }
 
 /*

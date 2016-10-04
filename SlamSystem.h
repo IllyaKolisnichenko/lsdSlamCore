@@ -55,11 +55,11 @@ class   Frame;
 //class   DataSet;
 
 //class   LiveSLAMWrapper;
-//class   Output3DWrapper;
+class   Output3DWrapper;
 
 typedef Eigen::Matrix<float, 7, 7> Matrix7x7;
 
-class SlamSystem : public InputImageStream
+class SlamSystem
 {
 friend class IntegrationTest;
 public:
