@@ -109,6 +109,9 @@ public:
 //    inline SlamSystem* getSlamSystem() {return m_poMonoOdometry;}
 
     void detectAndDraw(cv::Mat &image);
+
+    void appendTestBorders(cv::Mat &image);
+
 private:
     /// Pointer to the object of input thread
     InputImageStream*   m_poImageStream;
@@ -136,7 +139,7 @@ private:
     int     imageSeqNumber;
 
     // Классификаторы для обнраужения объекта
-//    cv::CascadeClassifier   m_pCVFaceCascade;
+    cv::CascadeClassifier   m_pCVFaceCascade;
 };
 
 }

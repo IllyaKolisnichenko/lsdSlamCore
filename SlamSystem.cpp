@@ -1261,6 +1261,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
         publishTrackedFrame(trackingNewFrame.get());
     }
 
+    //****************************************************************************************
     // Keyframe selection
     latestTrackedFrame = trackingNewFrame;
 
@@ -1301,6 +1302,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
         }
     }
+    //****************************************************************************************
 
     unmappedTrackedFramesMutex.lock();
 
@@ -1313,12 +1315,14 @@ void SlamSystem::trackFrame(    uchar*          image               ,
         // TODO: else - skip frame ????
         unmappedTrackedFrames.push_back(trackingNewFrame);
 
-
     unmappedTrackedFramesSignal.notify_one();
+
     unmappedTrackedFramesMutex.unlock();
 
+    //****************************************************************************************
+
     // For debugging without mapping thread
-//    doMappingIteration();
+    doMappingIteration();
 
     // Implement blocking
     if( blockUntilMapped && trackingIsGood )

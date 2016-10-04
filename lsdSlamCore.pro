@@ -58,8 +58,8 @@ unix {
                     -llsdSlamTracking
 
     INCLUDEPATH +=  ../lsdSlam3DOutput/
-#    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlam3DOutput      \
-#                    -llsdSlam3DOutput
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlam3DOutput      \
+                    -llsdSlam3DOutput
 
     # OpenCV
 #    OPENCV_INCLUDE_PATH        = /home/sergey/libs/opencv-3.0.0/include

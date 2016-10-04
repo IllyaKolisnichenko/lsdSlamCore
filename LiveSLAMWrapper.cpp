@@ -27,7 +27,7 @@
 //#include "IOWrapper/InputImageStream.h"
 #include "IOWrapper/VideoReader/slamvideoreader.h"
 
-//#include "Output3DWrapper/myoutput3dwrapper.h"
+#include "Output3DWrapper/myoutput3dwrapper.h"
 
 //#include "IOWrapper/OpenCV/slamimagedisplay.h"
 
@@ -73,9 +73,9 @@ LiveSLAMWrapper::LiveSLAMWrapper(const char* videoFilePath, const char* unditorF
         m_poMonoOdometry  = new SlamSystem( width, height, K_sophus, m_bDoSlam );
 
         // ROSOutput3DWrapper
-    //    m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
-    //                                                   m_poImageStream->height()   );
-    //    m_poMonoOdometry->setVisualization( m_poOutputWrapper );
+        m_poOutputWrapper =  new MyOutput3DWrapper(    m_poImageStream->width(),
+                                                       m_poImageStream->height()   );
+        m_poMonoOdometry->setVisualization( m_poOutputWrapper );
 
         // Null the counter
         imageSeqNumber = 0;
@@ -134,14 +134,17 @@ void LiveSLAMWrapper::Loop()
         /// !!!! Вывести изображение
         /// //TODO:
  //       m_poImageDisplay->displayImage( "MyVideo", image.data );
-        // Output the image
-        Util::displayImage( "MyVideo", image.data );
+
 
         // Process a new image
         newImageCallback( image.data, image.timestamp );
 
+        // Output the image
+        Util::displayImage( "MyVideo", image.data );
+
         //m_poImageDisplay->waitKey( 500 );
-        cv::waitKey( 100 );
+        //cv::waitKey( 10 );
+        cv::waitKey( 400 );
 	}
 }
 
@@ -162,6 +165,8 @@ void LiveSLAMWrapper::newImageCallback( const cv::Mat& img, Timestamp imgTime )
 	else
         // Transforming
         cvtColor( img, grayImg, CV_RGB2GRAY );
+
+    appendTestBorders(grayImg);
 	
 	// Assert that we work with 8 bit images
     assert( grayImg.elemSize() == 1 );
@@ -241,7 +246,6 @@ void LiveSLAMWrapper::resetAll()
 
 void LiveSLAMWrapper::detectAndDraw(cv::Mat &image )
 {
-    /*
     // Список прямоугольников для лиц
     std::vector < cv::Rect >   faces;
     // Временный фрейм
@@ -290,7 +294,34 @@ void LiveSLAMWrapper::detectAndDraw(cv::Mat &image )
     }
 
     image = frame_gray.clone();
-    */
+}
+
+void LiveSLAMWrapper::appendTestBorders(Mat &image)
+{
+    // Rectengle for border
+    cv::Rect    borderRect = cv::Rect( 30, 30, image.cols - 60, image.rows - 60 );
+    // Temporary image
+    cv::Mat     blackImage;
+    cv::Mat     m_oTempImage;
+
+    // Equalize histogram
+    cv::equalizeHist( image, image );
+
+//    // Clone imput to temp file
+//    blackImage = image.clone();
+//    // Make a fully black image
+//    blackImage.setTo(cv::Scalar(0, 0, 0));
+
+//    m_oTempImage = image.clone();
+
+//    m_oTempImage = m_oTempImage( borderRect );
+
+//    m_oTempImage.copyTo( blackImage(borderRect) );
+
+////    cv::imshow("Result Image", blackImage);
+
+//    // Save result in input image
+//    image = blackImage.clone();
 }
 
 }
