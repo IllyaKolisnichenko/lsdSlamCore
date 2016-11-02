@@ -27,14 +27,16 @@
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 
-#include "settings.h"
-#include "SophusUtil.h"
+#include "include/settings.h"
+#include "include/SophusUtil.h"
 
 #include "opencv2/core/core.hpp"
 
 #include "Relocalizer.h"
 
-//#include "IOWrapper/Timestamp.h"
+#include "lsdslamoutput.h"
+
+class DebugImage;
 
 namespace lsd_slam
 {
@@ -54,12 +56,9 @@ class   Frame;
 
 //class   DataSet;
 
-//class   LiveSLAMWrapper;
-class   Output3DWrapper;
-
 typedef Eigen::Matrix<float, 7, 7> Matrix7x7;
 
-class SlamSystem
+class SlamSystem : public lsdSlamOutput
 {
 friend class IntegrationTest;
 public:
@@ -119,7 +118,7 @@ public:
      * @brief Sets the visualization where point clouds and camera poses will be sent to.
      * @param outputWrapper
      */
-    void setVisualization( Output3DWrapper* outputWrapper );
+    void setVisualization(lsdSlamOutput* pOutputWrapper );
 
 private:
 
@@ -338,8 +337,6 @@ private:
 
     //*********************************************
 public:
-    void publishKeyframeGraph();
-
     float   msTrackFrame;
     float   msFindReferences;
 
@@ -373,7 +370,7 @@ private:
 
     // Individual / no locking
     /// No lock required
-    Output3DWrapper*	outputWrapper;
+    lsdSlamOutput*	m_pOutputWrapper;
 
     /// Has own locks
     KeyFrameGraph* 		keyFrameGraph;
@@ -438,6 +435,8 @@ private:
 
     /// It was in settings.h
     bool displayDepthMap;
+
+    DebugImage* m_pDebugImage;
 };
 
 }

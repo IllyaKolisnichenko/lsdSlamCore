@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT          -= core gui
+QT          += core gui
 QT          += widgets
 
 CONFIG      += c++11
@@ -18,65 +18,53 @@ DEFINES     += LSDSLAMCORE_LIBRARY
 #QMAKE_CXXFLAGS_DEBUG  += -pg
 #QMAKE_LFLAGS_DEBUG    += -pg
 
+INCLUDEPATH += $$PWD/include
+
 SOURCES +=  \
-            LiveSLAMWrapper.cpp \
-            SlamSystem.cpp
+            src/lsdslamoutput.cpp               \
+            src/SlamSystem.cpp                  \
+            src/lsdslamoutputstorage.cpp \
+    lsdslamoutputdefault.cpp
 
 HEADERS +=  \
-            LiveSLAMWrapper.h   \
-            SlamSystem.h
+            include/lsdslamoutput.h             \
+            include/SlamSystem.h                \
+            include/lsdslamoutputstorage.h \
+    lsdslamoutputdefault.h
 
 unix {
-
-#    INCLUDEPATH += /home/sergey/MyProject/MySlamProject/Qt/
-#    INCLUDEPATH += /home/sergey/libs/Sophus
 
     BASE_LIBS_PATH = $$PWD/../build
 
     INCLUDEPATH +=  ../lsdSlamUtil/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamUtil          \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
                     -llsdSlamUtil
 
     INCLUDEPATH +=  ../lsdSlamIO/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamIO            \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
                     -llsdSlamIO
 
     INCLUDEPATH +=  ../lsdSlamFrame/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamFrame         \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
                     -llsdSlamFrame
 
     INCLUDEPATH +=  ../lsdSlamGlobalMapping/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamGlobalMapping \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
                     -llsdSlamGlobalMapping
 
     INCLUDEPATH +=  ../lsdSlamTracking/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamTracking      \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
                     -llsdSlamTracking
 
-    INCLUDEPATH +=  ../lsdSlam3DOutput/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlam3DOutput      \
-                    -llsdSlam3DOutput
-
     # OpenCV
-#    OPENCV_INCLUDE_PATH        = /home/sergey/libs/opencv-3.0.0/include
-#    OPENCV_INCLUDE_MODULE_PATH = /home/sergey/libs/opencv-3.0.0/release/modules
-
-#    OPENCV_LIBS_PATH           = /home/sergey/libs/opencv-3.0.0/release/lib
-
-#        message( " Unix - Version OpenCV - 3.00 - Release " )
-#        message( $$OPENCV_LIBS_PATH )
-
-#        LIBS    += -L$$OPENCV_LIBS_PATH
-
-        LIBS    += -L/usr/local/lib
-        LIBS    += -lopencv_objdetect   -lopencv_imgproc
-        LIBS    += -lopencv_videoio     -lopencv_core
-        LIBS    += -lopencv_imgcodecs   -lopencv_highgui
+    LIBS    += -L/usr/local/lib
+    LIBS    += -lopencv_objdetect   -lopencv_imgproc
+    LIBS    += -lopencv_videoio     -lopencv_core
+    LIBS    += -lopencv_imgcodecs   -lopencv_highgui
 
     # Boost
     LIBS    +=  -lboost_thread -lboost_system
 
-    #target.path = /usr/lib
     target.path = $$BASE_LIBS_PATH/lsdSlamApp
     INSTALLS += target
 }

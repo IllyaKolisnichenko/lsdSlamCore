@@ -21,7 +21,7 @@
 #include "SlamSystem.h"
 
 #include "DataStructures/Frame.h"
-//#include "DataStructures/FrameMemory.h"
+#include "KeyFrameGraph.h"
 
 #include "DepthEstimation/DepthMap.h"
 
@@ -29,15 +29,12 @@
 #include "SE3Tracker.h"
 #include "TrackingReference.h"
 
-#include "globalFuncs.h"
+#include "include/globalFuncs.h"
 
-#include "KeyFrameGraph.h"
+#include "include/debugimage/debugimage.h"
 
 #include "TrackableKeyFrameSearch.h"
 //#include "g2oTypeSim3Sophus.h"
-
-#include "ImageDisplay.h"
-#include "Output3DWrapper/myoutput3dwrapper.h"
 
 //#include <g2o/core/robust_kernel_impl.h>
 
@@ -46,10 +43,6 @@
 // for mkdir
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#ifdef ANDROID
-#include <android/log.h>
-#endif
 
 #include "opencv2/opencv.hpp"
 
@@ -61,6 +54,12 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
     displayDepthMap (   true        ),
     relocalizer     ( w,h,K			)
 {
+    m_pOutputWrapper = this;
+
+    std::cout << "SlamSystem: Try to DebugImage instace create .."  << std::endl;
+    m_pDebugImage = DebugImage::getInstance();
+    std::cout << "SlamSystem: DebugImage instace created .."  << std::endl;
+
     // The sides of an image must be divisible by 16
 	if(w%16 != 0 || h%16!=0)
 	{
@@ -135,15 +134,13 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
         candidateTrackingReference	= 0;
     }
 
-    outputWrapper = 0;
-
 	keepRunning 				= true;
 	doFinalOptimization 		= false;
 	depthMapScreenshotFlag 		= false;
 	lastTrackingClosenessScore 	= 0;
 
     // Run the mapping function in a new Thread
-    // thread_mapping = boost::thread(&SlamSystem::mappingThreadLoop, this);
+     thread_mapping = boost::thread(&SlamSystem::mappingThreadLoop, this);
 
     if( SLAMEnabled )
 	{
@@ -223,12 +220,12 @@ SlamSystem::~SlamSystem()
 
 	FrameMemory::getInstance().releaseBuffes();
 
-    Util::closeAllWindows();
+    m_pDebugImage->closeAllWindows();
 }
 
-void SlamSystem::setVisualization(Output3DWrapper* outputWrapper)
+void SlamSystem::setVisualization(lsdSlamOutput* pOutputWrapper)
 {
-    this->outputWrapper = outputWrapper;
+    this->m_pOutputWrapper = pOutputWrapper;
 }
 
 void SlamSystem::mergeOptimizationOffset()
@@ -238,11 +235,13 @@ void SlamSystem::mergeOptimizationOffset()
 
     // Do we need to publish(visualize) ???
 	bool needPublish = false;
-	if(haveUnmergedOptimizationOffset)
+    if( haveUnmergedOptimizationOffset )
     {
         keyFrameGraph->keyframesAllMutex.lock_shared();
-        for(unsigned int i=0;i<keyFrameGraph->keyframesAll.size(); i++)
+
+        for( unsigned int i=0; i < keyFrameGraph->keyframesAll.size(); i++ )
             keyFrameGraph->keyframesAll[i]->pose->applyPoseGraphOptResult();
+
         keyFrameGraph->keyframesAllMutex.unlock_shared();
 
 		haveUnmergedOptimizationOffset = false;
@@ -251,8 +250,8 @@ void SlamSystem::mergeOptimizationOffset()
 
 	poseConsistencyMutex.unlock();
 
-    if(needPublish)
-        publishKeyframeGraph();
+    if( needPublish )
+        m_pOutputWrapper->publishKeyframeGraph( keyFrameGraph );
 }
 
 void SlamSystem::mappingThreadLoop() // Works independent from tracking
@@ -474,12 +473,6 @@ void SlamSystem::optimizationThreadLoop()
 	printf("Exited optimization thread \n");
 }
 
-void SlamSystem::publishKeyframeGraph()
-{
-    if (outputWrapper != nullptr)
-        outputWrapper->publishKeyframeGraph(keyFrameGraph);
-}
-
 void SlamSystem::requestDepthMapScreenshot(const std::string& filename)
 {
     depthMapScreenshotFilename  = filename;
@@ -517,8 +510,7 @@ void SlamSystem::finishCurrentKeyframe()
         }
     }
 
-    if(outputWrapper != 0 )
-        outputWrapper->publishKeyframe( currentKeyFrame.get() );
+    m_pOutputWrapper->publishKeyframe( currentKeyFrame.get() );
 }
 
 void SlamSystem::discardCurrentKeyframe()
@@ -574,7 +566,7 @@ void SlamSystem::createNewCurrentKeyframe(std::shared_ptr<Frame> newKeyframeCand
         data[1] = (runningStats.num_prop_created + runningStats.num_prop_merged) / (float)runningStats.num_prop_attempts;
         data[2] = runningStats.num_prop_removed_colorDiff / (float)runningStats.num_prop_attempts;
 
-        outputWrapper->publishDebugInfo(data);
+        m_pOutputWrapper->publishDebugInfo(data);
     }
 
     currentKeyFrameMutex.lock();
@@ -728,16 +720,14 @@ bool SlamSystem::updateKeyframe()
         data[13] = runningStats.num_observe_skip_oob;
         data[14] = runningStats.num_observe_skip_fail;
 
-        if( outputWrapper )
-            outputWrapper->publishDebugInfo(data);
+        m_pOutputWrapper->publishDebugInfo(data);
     }
 
     // If everything is OK
-    if( outputWrapper != 0  &&
-        continuousPCOutput  &&
+    if( continuousPCOutput  &&
         currentKeyFrame != 0        )
         // Publish current Key Frame for redraw Point Cloud
-        outputWrapper->publishKeyframe( currentKeyFrame.get() );
+        m_pOutputWrapper->publishKeyframe( currentKeyFrame.get() );
 
     return true;
 }
@@ -851,9 +841,9 @@ void SlamSystem::debugDisplayDepthMap()
         printMessageOnCVImage( map->debugImageDepth, buf1, buf2 );
 
     if (displayDepthMap)
-        Util::displayImage( "DebugWindow DEPTH", map->debugImageDepth, false );
+        m_pDebugImage->displayImage( "DebugWindow DEPTH", map->debugImageDepth, false );
 
-    int pressedKey = Util::waitKey(1);
+    int pressedKey = m_pDebugImage->waitKey(1);
     handleKey(pressedKey);
 }
 
@@ -1079,14 +1069,11 @@ void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
     }
 
     // Visualization of the Key Frame (Vizualization 3D)
-    if( continuousPCOutput && outputWrapper != 0 )
-        outputWrapper->publishKeyframe( currentKeyFrame.get() );
+    if( continuousPCOutput  )
+        m_pOutputWrapper->publishKeyframe( currentKeyFrame.get() );
 
     if (displayDepthMap || depthMapScreenshotFlag)
         debugDisplayDepthMap();
-
-    // For debuging without mapping thread loop
-    // doMappingIteration();
 
     // Ouput of the debugging information
     printf("Done Random initialization!\n");
@@ -1229,7 +1216,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
         data[6] = tracker->affineEstimation_a;
         data[7] = tracker->affineEstimation_b;
         // Publish data
-        outputWrapper->publishDebugInfo(data);
+        m_pOutputWrapper->publishDebugInfo(data);
     }
 
     // Append KF to KF graph
@@ -1237,10 +1224,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
     // Sim3 lastTrackedCamToWorld = mostCurrentTrackedFrame->getScaledCamToWorld();
     //  mostCurrentTrackedFrame->TrackingParent->getScaledCamToWorld() * sim3FromSE3(mostCurrentTrackedFrame->thisToParent_SE3TrackingResult, 1.0);
-    if (outputWrapper != 0)
-    {
-        outputWrapper->publishTrackedFrame(trackingNewFrame.get());
-    }
+    m_pOutputWrapper->publishTrackedFrame(trackingNewFrame.get());
 
     // Keyframe selection
     latestTrackedFrame = trackingNewFrame;
@@ -1299,7 +1283,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     unmappedTrackedFramesMutex.unlock();
 
     // For debugging without mapping thread
-    doMappingIteration();
+//    doMappingIteration();
 
     // Implement blocking
     if( blockUntilMapped && trackingIsGood )
