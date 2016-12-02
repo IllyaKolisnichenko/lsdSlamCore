@@ -32,6 +32,7 @@
 #include "include/globalFuncs.h"
 
 #include "include/debugimage/debugimage.h"
+#include "lsdslamoutput.h"
 
 #include "TrackableKeyFrameSearch.h"
 //#include "g2oTypeSim3Sophus.h"
@@ -52,16 +53,16 @@ using namespace lsd_slam;
 SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
     SLAMEnabled		( enableSLAM	),
     displayDepthMap (   true        ),
-    relocalizer     ( w,h,K			)
+    relocalizer     ( w, h/*, K*/		)
 {
-    m_pOutputWrapper = this;
+    m_pOutputWrapper = lsdSlamOutput::create( lsdSlamOutput::Storage_ID );
 
     std::cout << "SlamSystem: Try to DebugImage instace create .."  << std::endl;
     m_pDebugImage = DebugImage::getInstance();
     std::cout << "SlamSystem: DebugImage instace created .."  << std::endl;
 
     // The sides of an image must be divisible by 16
-	if(w%16 != 0 || h%16!=0)
+    if( w%16 != 0 || h%16!=0 )
 	{
         // Output the image
 		printf("image dimensions must be multiples of 16! Please crop your images / video accordingly.\n");
@@ -95,8 +96,8 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
 
     // Create an instance of the tracker
     tracker = new SE3Tracker( this->width,
-                              this->height,
-                              this->K       );
+                              this->height/*,
+                              this->K      */ );
 
 	// Do not use more than 4 levels for odometry tracking
     for (int level = 4; level < PYRAMID_LEVELS; ++level)
@@ -110,15 +111,15 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
         trackableKeyFrameSearch 	= new TrackableKeyFrameSearch( keyFrameGraph,
                                                                    this->width,
                                                                    this->height,
-                                                                   this->K);
+                                                                   this->K );
 
         constraintTracker 			= new Sim3Tracker   (   this->width,
-                                                            this->height,
-                                                            this->K         );
+                                                            this->height/*,
+                                                            this->K         */);
 
         constraintSE3Tracker 		= new SE3Tracker    (   this->width,
-                                                            this->height,
-                                                            this->K         );
+                                                            this->height/*,
+                                                            this->K         */);
 
         newKFTrackingReference 		= new TrackingReference();
         candidateTrackingReference	= new TrackingReference();

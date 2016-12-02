@@ -21,29 +21,31 @@
 #pragma once
 
 #include <string>
-#include <fstream>
 
 #include "include/SophusUtil.h"
 
-namespace cv {
-	class Mat;
-}
+//class cv::Mat;
+class KeyFrameGraph;
+
+using namespace lsd_slam;
 
 namespace lsd_slam
 {
-
-class KeyFrameGraph;
-class Frame;
+    class Frame;
+    class KeyFrameGraph;
+}
 
 /** A class. Output3DWrapper. Virtual 3D display object. */
 class lsdSlamOutput
 {
 public:
-    lsdSlamOutput();
+    enum LsdSlamOutput_ID { Default_ID = 0, Storage_ID };
 
-    virtual ~lsdSlamOutput();
+public:
+//    lsdSlamOutput();
+    virtual ~lsdSlamOutput(){}
 
-    virtual void publishKeyframeGraph( KeyFrameGraph* graph );
+    virtual void publishKeyframeGraph( lsd_slam::KeyFrameGraph* graph ) = 0;
 
     /**
      * @brief publishKeyframe
@@ -51,7 +53,7 @@ public:
      * Publishes a keyframe. if that frame already existis, it is overwritten, otherwise it is added.
      * @param kf
      */
-    virtual void publishKeyframe(Frame* kf);
+    virtual void publishKeyframe    ( lsd_slam::Frame* kf) = 0;
 
     /**
      * @brief publishTrackedFrame
@@ -59,7 +61,7 @@ public:
      * Published a tracked frame that did not become a keyframe (yet; i.e. has no depth data)
      * @param kf
      */
-    virtual void publishTrackedFrame( Frame* kf );
+    virtual void publishTrackedFrame( lsd_slam::Frame* kf ) = 0;
 
     /**
      * @brief publishTrajectory
@@ -69,22 +71,13 @@ public:
      * @param identifier
      */
     virtual void publishTrajectory          ( std::vector< Eigen::Matrix< float, 3, 1 > >   trajectory,
-                                              std::string                                   identifier  );
+                                              std::string                                   identifier  ) = 0;
 
     virtual void publishTrajectoryIncrement ( Eigen::Matrix< float, 3, 1 >  pt,
-                                                std::string                 identifier  );
+                                                std::string                 identifier  ) = 0;
 
-    virtual void publishDebugInfo(Eigen::Matrix<float, 20, 1> data);
+    virtual void publishDebugInfo(Eigen::Matrix<float, 20, 1> data) = 0;
 
-
-private:
-    // Temp solution - path coods file
-    std::ofstream* pCoodsStream;
-
-    // Temp solution Point Cloud coods
-    char* xyzFileNamePart;
-    char* xyzFilename;
-    char* xyzFilenameFormat;
+    static lsdSlamOutput* create( LsdSlamOutput_ID id = Default_ID );
 
 };
-}

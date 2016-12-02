@@ -23,14 +23,14 @@ INCLUDEPATH += $$PWD/include
 SOURCES +=  \
             src/lsdslamoutput.cpp               \
             src/SlamSystem.cpp                  \
-            src/lsdslamoutputstorage.cpp \
-    lsdslamoutputdefault.cpp
+            src/lsdslamoutputstorage.cpp        \
+            src/lsdslamoutputdefault.cpp
 
 HEADERS +=  \
             include/lsdslamoutput.h             \
             include/SlamSystem.h                \
-            include/lsdslamoutputstorage.h \
-    lsdslamoutputdefault.h
+            src/lsdslamoutputstorage.h          \
+            src/lsdslamoutputdefault.h
 
 unix {
 
@@ -45,15 +45,15 @@ unix {
                     -llsdSlamIO
 
     INCLUDEPATH +=  ../lsdSlamFrame/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamFrame       \
                     -llsdSlamFrame
 
     INCLUDEPATH +=  ../lsdSlamGlobalMapping/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamGlobalMapping       \
                     -llsdSlamGlobalMapping
 
     INCLUDEPATH +=  ../lsdSlamTracking/
-    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamApp       \
+    LIBS        +=  -L$$BASE_LIBS_PATH/lsdSlamTracking       \
                     -llsdSlamTracking
 
     # OpenCV

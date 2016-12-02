@@ -34,9 +34,8 @@
 
 #include "Relocalizer.h"
 
-#include "lsdslamoutput.h"
-
 class DebugImage;
+class lsdSlamOutput;
 
 namespace lsd_slam
 {
@@ -58,7 +57,7 @@ class   Frame;
 
 typedef Eigen::Matrix<float, 7, 7> Matrix7x7;
 
-class SlamSystem : public lsdSlamOutput
+class SlamSystem
 {
 friend class IntegrationTest;
 public:
@@ -368,13 +367,8 @@ private:
 	boost::condition_variable  	newFrameMappedSignal;
 	boost::mutex 				newFrameMappedMutex;
 
-    // Individual / no locking
-    /// No lock required
-    lsdSlamOutput*	m_pOutputWrapper;
-
     /// Has own locks
     KeyFrameGraph* 		keyFrameGraph;
-
 
     /**
      *  Tracking:    if (!create) set candidate, set     create.
@@ -436,7 +430,11 @@ private:
     /// It was in settings.h
     bool displayDepthMap;
 
+    /// TODO: Bring OUT from this Classes
     DebugImage* m_pDebugImage;
+    // Individual / no locking
+    /// No lock required
+    lsdSlamOutput*	m_pOutputWrapper;
 };
 
 }
