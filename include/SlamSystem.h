@@ -149,7 +149,7 @@ public:
      * @warning (Not thread-safe)
      * @return Returns the pointer to the current frame
      */
-    inline Frame* getCurrentKeyframe() { return currentKeyFrame.get();}
+    inline Frame* getCurrentKeyframe() { return m_pCurrentKeyFrame.get();}
 
 private:
     void finishCurrentKeyframe();
@@ -166,7 +166,7 @@ private:
 private:
 
     /// SET & READ EVERYWHERE. Changed (and, for VO, maybe deleted). Only by Mapping thread within exclusive lock.
-    std::shared_ptr<Frame>      currentKeyFrame;
+    std::shared_ptr<Frame>      m_pCurrentKeyFrame;
 
     /// Only used in odometry-mode, to keep a Key Frame alive until it is deleted. Only accessed within currentKeyFrameMutex lock.
     std::shared_ptr<Frame>      trackingReferenceFrameSharedPT;
@@ -352,7 +352,7 @@ private:
 
     // ============= EXCLUSIVELY TRACKING THREAD (+ init) ===============
     ///  Tracking reference for current keyframe. Only used by tracking.
-    TrackingReference*	trackingReference;
+    TrackingReference*	m_pCurrentFrameTrackingReference;
     SE3Tracker* 		tracker;
 
     // ============= SHARED ENTITIES ============= */

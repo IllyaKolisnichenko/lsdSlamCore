@@ -18,7 +18,7 @@ lsdSlamOutputStorage::lsdSlamOutputStorage()
     // File stream for estimated camera position data
     m_pPosFileStream = new std::ofstream( m_sPoseFileName );
     // First Frame
-//    *m_pPosFileStream << "1 0 0 0 0 0 0 1" << std::endl;
+    *m_pPosFileStream << "1 0 0 0 1 0 0 0" << std::endl;
 
     // Estimated camera positons file
     char* keyframeFileName = "/home/sergey/MyLsdSlamProject/TestData/keyframesCoods.txt";
@@ -34,7 +34,11 @@ lsdSlamOutputStorage::lsdSlamOutputStorage()
     // Set template
     xyzFilenameFormat = "%s_%010"PRIu32".xyz";
     // Mesuring buffer length
-    int max_name_len = snprintf( NULL, 0, xyzFilenameFormat, xyzFilename, UINT32_MAX );
+    int max_name_len = snprintf( NULL,
+                                 0,
+                                 xyzFilenameFormat,
+                                 xyzFilename,
+                                 UINT32_MAX         );
 
     // Save temporary
     m_pXyzFileNamePart = xyzFilename;

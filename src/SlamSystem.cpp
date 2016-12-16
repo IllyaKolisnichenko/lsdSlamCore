@@ -55,6 +55,7 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
     displayDepthMap (   true        ),
     relocalizer     ( w, h/*, K*/		)
 {
+    // Make output instance
     m_pOutputWrapper = lsdSlamOutput::create( lsdSlamOutput::Storage_ID );
 
     std::cout << "SlamSystem: Try to DebugImage instace create .."  << std::endl;
@@ -78,7 +79,7 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
     // Tracking is good by default
 	trackingIsGood 	= true;
 
-	currentKeyFrame 				= nullptr;
+    m_pCurrentKeyFrame 				= nullptr;
 	trackingReferenceFrameSharedPT	= nullptr;
 
     // Craete a new graph
@@ -103,7 +104,7 @@ SlamSystem::SlamSystem( int w, int h, Eigen::Matrix3f K, bool enableSLAM ) :
     for (int level = 4; level < PYRAMID_LEVELS; ++level)
         tracker->settings.maxItsPerLvl[level] = 0;
 
-    trackingReference 			= new TrackingReference();
+    m_pCurrentFrameTrackingReference 			= new TrackingReference();
     mappingTrackingReference 	= new TrackingReference();
 
     if( SLAMEnabled )
@@ -206,14 +207,14 @@ SlamSystem::~SlamSystem()
 
     delete mappingTrackingReference;
     delete map;
-    delete trackingReference;
+    delete m_pCurrentFrameTrackingReference;
     delete tracker;
 
     // Make shure to reset all shared pointers to all frames before deleting the keyframegraph!
 	unmappedTrackedFrames.clear();
 	latestFrameTriedForReloc.reset();
 	latestTrackedFrame.reset();
-	currentKeyFrame.reset();
+    m_pCurrentKeyFrame.reset();
 	trackingReferenceFrameSharedPT.reset();
 
     // Delete keyframe graph
@@ -483,43 +484,43 @@ void SlamSystem::requestDepthMapScreenshot(const std::string& filename)
 void SlamSystem::finishCurrentKeyframe()
 {
     if(enablePrintDebugInfo && printThreadingInfo)
-        printf("FINALIZING KF %d\n", currentKeyFrame->id());
+        printf("FINALIZING KF %d\n", m_pCurrentKeyFrame->id());
 
     map->finalizeKeyFrame();
 
     if(SLAMEnabled)
     {
-        mappingTrackingReference->importFrame(currentKeyFrame.get());
-        currentKeyFrame->setPermaRef(mappingTrackingReference);
+        mappingTrackingReference->importFrame(m_pCurrentKeyFrame.get());
+        m_pCurrentKeyFrame->setPermaRef(mappingTrackingReference);
         mappingTrackingReference->invalidate();
 
-        if(currentKeyFrame->idxInKeyframes < 0)
+        if(m_pCurrentKeyFrame->idxInKeyframes < 0)
         {
             keyFrameGraph->keyframesAllMutex.lock();
-            currentKeyFrame->idxInKeyframes = keyFrameGraph->keyframesAll.size();
+            m_pCurrentKeyFrame->idxInKeyframes = keyFrameGraph->keyframesAll.size();
 
-            keyFrameGraph->keyframesAll.push_back(currentKeyFrame.get());
+            keyFrameGraph->keyframesAll.push_back(m_pCurrentKeyFrame.get());
 
-            keyFrameGraph->totalPoints += currentKeyFrame->numPoints;
+            keyFrameGraph->totalPoints += m_pCurrentKeyFrame->numPoints;
             keyFrameGraph->totalVertices ++;
             keyFrameGraph->keyframesAllMutex.unlock();
 
             newKeyFrameMutex.lock();
-            newKeyFrames.push_back(currentKeyFrame.get());
+            newKeyFrames.push_back(m_pCurrentKeyFrame.get());
             newKeyFrameCreatedSignal.notify_all();
             newKeyFrameMutex.unlock();
         }
     }
 
-    m_pOutputWrapper->publishKeyframe( currentKeyFrame.get() );
+    m_pOutputWrapper->publishKeyframe( m_pCurrentKeyFrame.get() );
 }
 
 void SlamSystem::discardCurrentKeyframe()
 {
     if(enablePrintDebugInfo && printThreadingInfo)
-        printf("DISCARDING KF %d\n", currentKeyFrame->id());
+        printf("DISCARDING KF %d\n", m_pCurrentKeyFrame->id());
 
-    if(currentKeyFrame->idxInKeyframes >= 0)
+    if(m_pCurrentKeyFrame->idxInKeyframes >= 0)
     {
         printf("WARNING: trying to discard a KF that has already been added to the graph... finalizing instead.\n");
         finishCurrentKeyframe();
@@ -531,20 +532,20 @@ void SlamSystem::discardCurrentKeyframe()
     keyFrameGraph->allFramePosesMutex.lock();
     for(FramePoseStruct* p : keyFrameGraph->allFramePoses)
     {
-        if(p->trackingParent != 0 && p->trackingParent->frameID == currentKeyFrame->id())
+        if(p->trackingParent != 0 && p->trackingParent->frameID == m_pCurrentKeyFrame->id())
             p->trackingParent = 0;
     }
     keyFrameGraph->allFramePosesMutex.unlock();
 
     keyFrameGraph->idToKeyFrameMutex.lock();
-    keyFrameGraph->idToKeyFrame.erase(currentKeyFrame->id());
+    keyFrameGraph->idToKeyFrame.erase(m_pCurrentKeyFrame->id());
     keyFrameGraph->idToKeyFrameMutex.unlock();
 }
 
 void SlamSystem::createNewCurrentKeyframe(std::shared_ptr<Frame> newKeyframeCandidate)
 {
     if(enablePrintDebugInfo && printThreadingInfo)
-        printf("CREATE NEW KF %d from %d\n", newKeyframeCandidate->id(), currentKeyFrame->id());
+        printf("CREATE NEW KF %d from %d\n", newKeyframeCandidate->id(), m_pCurrentKeyFrame->id());
 
 
     if(SLAMEnabled)
@@ -571,7 +572,7 @@ void SlamSystem::createNewCurrentKeyframe(std::shared_ptr<Frame> newKeyframeCand
     }
 
     currentKeyFrameMutex.lock();
-    currentKeyFrame = newKeyframeCandidate;
+    m_pCurrentKeyFrame = newKeyframeCandidate;
     currentKeyFrameMutex.unlock();
 }
 
@@ -587,8 +588,8 @@ void SlamSystem::loadNewCurrentKeyframe(Frame* keyframeToLoad)
 
     currentKeyFrameMutex.lock();
 
-    currentKeyFrame = keyFrameGraph->idToKeyFrame.find(keyframeToLoad->id())->second;
-    currentKeyFrame->depthHasBeenUpdatedFlag = false;
+    m_pCurrentKeyFrame = keyFrameGraph->idToKeyFrame.find(keyframeToLoad->id())->second;
+    m_pCurrentKeyFrame->depthHasBeenUpdatedFlag = false;
     currentKeyFrameMutex.unlock();
 }
 
@@ -646,7 +647,7 @@ bool SlamSystem::updateKeyframe()
                 // If first element doesn't have a parent (wasn't processed by SE3Tracker::TrackFrame)
             (   !unmappedTrackedFrames.front()->hasTrackingParent() ||
                 // or have different parent KeyFrame
-                 unmappedTrackedFrames.front()->getTrackingParent() != currentKeyFrame.get() )   )
+                 unmappedTrackedFrames.front()->getTrackingParent() != m_pCurrentKeyFrame.get() )   )
     {
         // Delete data (clearing the memory)
         unmappedTrackedFrames.front()->clear_refPixelWasGood();
@@ -676,7 +677,7 @@ bool SlamSystem::updateKeyframe()
         // Print debug info
         if(enablePrintDebugInfo && printThreadingInfo)
             printf( "MAPPING %d on %d to %d (%d frames)\n",
-                    currentKeyFrame->id(),
+                    m_pCurrentKeyFrame->id(),
                     references.front()->id(),
                     references.back()->id(),
                     (int)references.size()      );
@@ -726,9 +727,9 @@ bool SlamSystem::updateKeyframe()
 
     // If everything is OK
     if( continuousPCOutput  &&
-        currentKeyFrame != 0        )
+        m_pCurrentKeyFrame != 0        )
         // Publish current Key Frame for redraw Point Cloud
-        m_pOutputWrapper->publishKeyframe( currentKeyFrame.get() );
+        m_pOutputWrapper->publishKeyframe( m_pCurrentKeyFrame.get() );
 
     return true;
 }
@@ -807,8 +808,8 @@ void SlamSystem::debugDisplayDepthMap()
 
     double scale = 1;
     // if(currentKeyFrame != 0 && currentKeyFrame != 0) // ??????????
-    if( currentKeyFrame != 0 )
-         scale = currentKeyFrame->getScaledCamToWorld().scale();
+    if( m_pCurrentKeyFrame != 0 )
+         scale = m_pCurrentKeyFrame->getScaledCamToWorld().scale();
 
     // Debug plot depthmap
     char buf1[200];
@@ -821,14 +822,14 @@ void SlamSystem::debugDisplayDepthMap()
                 map->nAvgUpdate,
                 msTrackFrame,
                 nAvgTrackFrame,
-                currentKeyFrame->numFramesTrackedOnThis,
-                currentKeyFrame->numMappedOnThis,
+                m_pCurrentKeyFrame->numFramesTrackedOnThis,
+                m_pCurrentKeyFrame->numMappedOnThis,
                 (int)unmappedTrackedFrames.size()           );
 
     snprintf(   buf2,
                 200,
                 "dens %2.0f%%; good %2.0f%%; scale %2.2f; res %2.1f/; usg %2.0f%%; Map: %d F, %d KF, %d E, %.1fm Pts",
-                100*currentKeyFrame->numPoints/(float)(width*height),
+                100*m_pCurrentKeyFrame->numPoints/(float)(width*height),
                 100*tracking_lastGoodPerBad,
                 scale,
                 tracking_lastResidual,
@@ -862,11 +863,11 @@ void SlamSystem::takeRelocalizeResult()
     loadNewCurrentKeyframe(keyframe);
 
     currentKeyFrameMutex.lock();
-    trackingReference->importFrame(currentKeyFrame.get());
-    trackingReferenceFrameSharedPT = currentKeyFrame;
+    m_pCurrentFrameTrackingReference->importFrame(m_pCurrentKeyFrame.get());
+    trackingReferenceFrameSharedPT = m_pCurrentKeyFrame;
     currentKeyFrameMutex.unlock();
 
-    tracker->trackFrame(    trackingReference   ,
+    tracker->trackFrame(    m_pCurrentFrameTrackingReference   ,
                             succFrame.get()     ,
                             succFrameToKF_init      );
 
@@ -875,7 +876,7 @@ void SlamSystem::takeRelocalizeResult()
     {
         if(enablePrintDebugInfo && printRelocalizationInfo)
             printf("RELOCALIZATION FAILED BADLY! discarding result.\n");
-        trackingReference->invalidate();
+        m_pCurrentFrameTrackingReference->invalidate();
     }
     else
     {
@@ -901,15 +902,15 @@ void SlamSystem::takeRelocalizeResult()
 bool SlamSystem::doMappingIteration()
 {
     // If current frame is not set
-    if(currentKeyFrame == 0)
+    if(m_pCurrentKeyFrame == 0)
         // Return error
         return false;
 
     // If no need to do mapping and parameter is still not changed
-    if( !doMapping && currentKeyFrame->idxInKeyframes < 0 )
+    if( !doMapping && m_pCurrentKeyFrame->idxInKeyframes < 0 )
     {
         // If the amount of frames processed in this selection is MORE or EQUAL to given
-        if( currentKeyFrame->numMappedOnThisTotal >= MIN_NUM_MAPPED )
+        if( m_pCurrentKeyFrame->numMappedOnThisTotal >= MIN_NUM_MAPPED )
             // Finish the Key Frame
             finishCurrentKeyframe();
         else
@@ -920,7 +921,7 @@ bool SlamSystem::doMappingIteration()
         map->invalidate();
 
         // Сообщить об окончании формирования ключевого кадра с номером
-        printf( "Finished KF %d as Mapping got disabled!\n", currentKeyFrame->id() );
+        printf( "Finished KF %d as Mapping got disabled!\n", m_pCurrentKeyFrame->id() );
 
         // Нужно вникнуть...
         changeKeyframe(true, true, 1.0f);
@@ -981,7 +982,7 @@ bool SlamSystem::doMappingIteration()
         // Invalidate the map if it was valid
         if(map->isValid()) // Depth map
         {
-            if(currentKeyFrame->numMappedOnThisTotal >= MIN_NUM_MAPPED)
+            if(m_pCurrentKeyFrame->numMappedOnThisTotal >= MIN_NUM_MAPPED)
                 finishCurrentKeyframe();
             else
                 discardCurrentKeyframe();
@@ -1044,14 +1045,14 @@ void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
     currentKeyFrameMutex.lock();
 
     // Create a new frame and reset ( "reset" will replace existing pointer)
-    currentKeyFrame.reset( new Frame( id, width, height, K, timeStamp, image ) );
+    m_pCurrentKeyFrame.reset( new Frame( id, width, height, K, timeStamp, image ) );
 
     // Initialize the depth map
-    map->initializeRandomly( currentKeyFrame.get() );
+    map->initializeRandomly( m_pCurrentKeyFrame.get() );
 
     // Add the Key Frame to the graph
     // Save the position of the frame "pose" in the list
-    keyFrameGraph->addFrame( currentKeyFrame.get() );
+    keyFrameGraph->addFrame( m_pCurrentKeyFrame.get() );
 
     // Unlock the thread
     currentKeyFrameMutex.unlock();
@@ -1063,15 +1064,15 @@ void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
         // Add the frame connected with Id to the list
         keyFrameGraph->idToKeyFrameMutex.lock();
 
-        keyFrameGraph->idToKeyFrame.insert( std::make_pair( currentKeyFrame->id(),
-                                                            currentKeyFrame         ) );
+        keyFrameGraph->idToKeyFrame.insert( std::make_pair( m_pCurrentKeyFrame->id(),
+                                                            m_pCurrentKeyFrame         ) );
         // Unlock the thread
         keyFrameGraph->idToKeyFrameMutex.unlock();
     }
 
     // Visualization of the Key Frame (Vizualization 3D)
     if( continuousPCOutput  )
-        m_pOutputWrapper->publishKeyframe( currentKeyFrame.get() );
+        m_pOutputWrapper->publishKeyframe( m_pCurrentKeyFrame.get() );
 
     if (displayDepthMap || depthMapScreenshotFlag)
         debugDisplayDepthMap();
@@ -1087,7 +1088,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
                                 double          timestamp               )
 {
     // Create new frame (copying an input image)
-    std::shared_ptr<Frame> trackingNewFrame(    new Frame(  frameID     ,
+    std::shared_ptr<Frame> pNewTrackingFrame(   new Frame(  frameID     ,
                                                             width       ,
                                                             height      ,
                                                             K           ,
@@ -1099,7 +1100,7 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     if( !trackingIsGood )
     {
         // Refresh the current frame
-        relocalizer.updateCurrentFrame( trackingNewFrame );
+        relocalizer.updateCurrentFrame( pNewTrackingFrame );
 
         // Lock the thread (which???? )
         unmappedTrackedFramesMutex.lock();
@@ -1122,20 +1123,20 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
     // Find out what we check here !!!
     // ( The condition of trackingReference depends on other thread)
-    if (    trackingReference->keyframe != currentKeyFrame.get()    ||
-            currentKeyFrame->depthHasBeenUpdatedFlag    )
+    if (    m_pCurrentFrameTrackingReference->keyframe != m_pCurrentKeyFrame.get()    ||
+            m_pCurrentKeyFrame->depthHasBeenUpdatedFlag    )
     {
         // Make appropriate changes (update data in trackingReference)
         // If tracking reference doesn't match to the current frame or depth map is updated
-        trackingReference->importFrame( currentKeyFrame.get() );
+        m_pCurrentFrameTrackingReference->importFrame( m_pCurrentKeyFrame.get() );
         // Clear flag
-        currentKeyFrame->depthHasBeenUpdatedFlag = false;
+        m_pCurrentKeyFrame->depthHasBeenUpdatedFlag = false;
         // Update pointer
-        trackingReferenceFrameSharedPT = currentKeyFrame;
+        trackingReferenceFrameSharedPT = m_pCurrentKeyFrame;
     }
 
     // Make a reference to ... (check the usage)
-    FramePoseStruct* trackingReferencePose = trackingReference->keyframe->pose;
+    FramePoseStruct* pCurrentKeyFramePose = m_pCurrentFrameTrackingReference->keyframe->pose;
 
     // Unlock
     currentKeyFrameMutex.unlock();
@@ -1143,13 +1144,17 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     // DO TRACKING & Show tracking result.
     if( enablePrintDebugInfo && printThreadingInfo )
         // Show the information
-        printf( "TRACKING %d on %d\n", trackingNewFrame->id(), trackingReferencePose->frameID );
+        printf( "TRACKING %d on %d\n", pNewTrackingFrame->id(), pCurrentKeyFramePose->frameID );
 
     // Lock an access to the data
     poseConsistencyMutex.lock_shared();
 
+    //*************************************************************************************
     // Find out what is it ???
-    SE3 frameToReference_initialEstimate = se3FromSim3( trackingReferencePose->getCamToWorld().inverse() * keyFrameGraph->allFramePoses.back()->getCamToWorld());
+    // Положение тeкущего Kf тоже редактируется, так что оно пока относительно
+    // по этому текущее значение нужно умножить на положение предыдущего KF
+    SE3 frameToReference_initialEstimate = se3FromSim3( pCurrentKeyFramePose->getCamToWorld().inverse() *
+                                                        keyFrameGraph->allFramePoses.back()->getCamToWorld()    );
 
     // Unlock the access
     poseConsistencyMutex.unlock_shared();
@@ -1161,15 +1166,17 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     // Store the time of the beginning
     gettimeofday( &tv_start, NULL );
 
-    SE3 newRefToFrame_poseUpdate = tracker->trackFrame( trackingReference       ,
-                                                        trackingNewFrame.get()  ,
+    SE3 newRefToFrame_poseUpdate = tracker->trackFrame( m_pCurrentFrameTrackingReference,
+                                                        pNewTrackingFrame.get(),
                                                         frameToReference_initialEstimate    );
 
     // Store the time of finishing the calculation
     gettimeofday( &tv_end, NULL );
 
+    //*************************************************************************************
     // Count the time for function's execution
     msTrackFrame = 0.9 * msTrackFrame + 0.1 * ( (tv_end.tv_sec - tv_start.tv_sec) * 1000.0f + ( tv_end.tv_usec - tv_start.tv_usec )/ 1000.0f );
+
     // Frame counter incriment
     nTrackFrame++;
 
@@ -1177,19 +1184,19 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     tracking_lastResidual       = tracker->lastResidual;
     tracking_lastUsage          = tracker->pointUsage;
     tracking_lastGoodPerBad     = tracker->lastGoodCount / ( tracker->lastGoodCount + tracker->lastBadCount );
-    tracking_lastGoodPerTotal   = tracker->lastGoodCount / ( trackingNewFrame->width(SE3TRACKING_MIN_LEVEL)*trackingNewFrame->height(SE3TRACKING_MIN_LEVEL));
+    tracking_lastGoodPerTotal   = tracker->lastGoodCount / ( pNewTrackingFrame->width(SE3TRACKING_MIN_LEVEL)*pNewTrackingFrame->height(SE3TRACKING_MIN_LEVEL));
 
     if( manualTrackingLossIndicated     ||          // Tracking lost state made manualy
         tracker->diverged               ||
         ( keyFrameGraph->keyframesAll.size() > INITIALIZATION_PHASE_COUNT && !tracker->trackingWasGood    )  )
     {
         printf( "TRACKING LOST for frame %d (%1.2f%% good Points, which is %1.2f%% of available points, %s)!\n",
-                trackingNewFrame->id(),
+                pNewTrackingFrame->id(),
                 100*tracking_lastGoodPerTotal,
                 100*tracking_lastGoodPerBad,
                 tracker->diverged ? "DIVERGED" : "NOT DIVERGED");
 
-        trackingReference->invalidate();
+        m_pCurrentFrameTrackingReference->invalidate();
 
         trackingIsGood  = false;
         nextRelocIdx    = -1;
@@ -1221,19 +1228,19 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     }
 
     // Append KF to KF graph
-    keyFrameGraph->addFrame(trackingNewFrame.get());
+    keyFrameGraph->addFrame(pNewTrackingFrame.get());
 
     // Sim3 lastTrackedCamToWorld = mostCurrentTrackedFrame->getScaledCamToWorld();
     //  mostCurrentTrackedFrame->TrackingParent->getScaledCamToWorld() * sim3FromSE3(mostCurrentTrackedFrame->thisToParent_SE3TrackingResult, 1.0);
-    m_pOutputWrapper->publishTrackedFrame(trackingNewFrame.get());
+    m_pOutputWrapper->publishTrackedFrame(pNewTrackingFrame.get());
 
     // Keyframe selection
-    latestTrackedFrame = trackingNewFrame;
+    latestTrackedFrame = pNewTrackingFrame;
 
     if (    !my_createNewKeyframe   &&
-            currentKeyFrame->numMappedOnThisTotal > MIN_NUM_MAPPED  )
+            m_pCurrentKeyFrame->numMappedOnThisTotal > MIN_NUM_MAPPED  )
     {
-        Sophus::Vector3d    dist    = newRefToFrame_poseUpdate.translation() * currentKeyFrame->meanIdepth;
+        Sophus::Vector3d    dist    = newRefToFrame_poseUpdate.translation() * m_pCurrentKeyFrame->meanIdepth;
         float               minVal  = fmin(0.2f + keyFrameGraph->keyframesAll.size() * 0.8f / INITIALIZATION_PHASE_COUNT,1.0f);
 
         if(keyFrameGraph->keyframesAll.size() < INITIALIZATION_PHASE_COUNT)
@@ -1247,8 +1254,8 @@ void SlamSystem::trackFrame(    uchar*          image               ,
 
             if(enablePrintDebugInfo && printKeyframeSelectionInfo)
                 printf(     "SELECT %d on %d! dist %.3f + usage %.3f = %.3f > 1\n",
-                            trackingNewFrame->id(),
-                            trackingNewFrame->getTrackingParent()->id(),
+                            pNewTrackingFrame->id(),
+                            pNewTrackingFrame->getTrackingParent()->id(),
                             dist.dot(dist),
                             tracker->pointUsage,
                             trackableKeyFrameSearch->getRefFrameScore(  dist.dot(dist),
@@ -1258,8 +1265,8 @@ void SlamSystem::trackFrame(    uchar*          image               ,
         {
             if( enablePrintDebugInfo && printKeyframeSelectionInfo )
                 printf(     "SKIPPD %d on %d! dist %.3f + usage %.3f = %.3f > 1\n",
-                            trackingNewFrame->id(),
-                            trackingNewFrame->getTrackingParent()->id(),
+                            pNewTrackingFrame->id(),
+                            pNewTrackingFrame->getTrackingParent()->id(),
                             dist.dot(dist),
                             tracker->pointUsage,
                             trackableKeyFrameSearch->getRefFrameScore(  dist.dot(dist),
@@ -1274,10 +1281,10 @@ void SlamSystem::trackFrame(    uchar*          image               ,
     // Conditions for adding of the current frame
     if(         unmappedTrackedFrames.size() < 50   ||
             (   unmappedTrackedFrames.size() < 100  &&
-                trackingNewFrame->getTrackingParent()->numMappedOnThisTotal < 10    )   )
+                pNewTrackingFrame->getTrackingParent()->numMappedOnThisTotal < 10    )   )
         // Add new frame to deque.
         // TODO: else - skip frame ????
-        unmappedTrackedFrames.push_back(trackingNewFrame);
+        unmappedTrackedFrames.push_back(pNewTrackingFrame);
 
 
     unmappedTrackedFramesSignal.notify_one();
